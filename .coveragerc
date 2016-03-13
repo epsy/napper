@@ -1,0 +1,13 @@
+[run]
+branch = True
+
+[report]
+exclude_lines =
+    pragma: no cover
+
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if sys.version_info
+
+include =
+    napper/*
