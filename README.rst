@@ -2,6 +2,14 @@
 napper
 ======
 
+.. image:: https://badges.gitter.im/epsy/napper.svg
+   :alt: Join the chat at https://gitter.im/epsy/napper
+   :target: https://gitter.im/epsy/napper?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+.. image:: https://travis-ci.org/epsy/napper.svg?branch=master
+   :target: https://travis-ci.org/epsy/napper
+.. image:: https://coveralls.io/repos/github/epsy/napper/badge.svg?branch=master
+   :target: https://coveralls.io/github/epsy/napper?branch=master
+
 A REST framework for asyncio.
 
 Currently in experimental stage. Use at your own risk.
