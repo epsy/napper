@@ -2,7 +2,7 @@
 # Copyright (C) 2016 by Yann Kaiser and contributors.
 # See AUTHORS and COPYING for details.
 from .util import run
-from .request import SiteFactory
+from .site import SiteFactory
 from .errors import CrossOriginRequestError
 
 __all__ = [

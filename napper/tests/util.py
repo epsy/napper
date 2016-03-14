@@ -9,7 +9,7 @@ import asyncio
 import json
 
 from ..util import rag
-from ..request import Site, SiteFactory
+from ..site import Site, SiteFactory
 
 
 class FakeTextResponse(object):
