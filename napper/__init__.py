@@ -2,11 +2,16 @@
 # Copyright (C) 2016 by Yann Kaiser and contributors.
 # See AUTHORS and COPYING for details.
 from .util import run
-from .site import SiteFactory
+from .site import SiteFactory, RestSpecFinder
 from .errors import CrossOriginRequestError
+
 
 __all__ = [
     'SiteFactory',
     'run',
     'CrossOriginRequestError',
     ]
+
+
+RestSpecFinder().install()
+del RestSpecFinder

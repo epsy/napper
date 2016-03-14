@@ -1,4 +1,8 @@
+import sys
 import aiohttp
+import json
+import importlib.abc
+import os.path
 
 from .util import metafunc, getattribute_common
 from .request import Request, RequestBuilder
@@ -8,6 +12,28 @@ from .errors import CrossOriginRequestError
 class SiteFactory:
     def __init__(self, address):
         self.address = address.rstrip('/')
+
+    def _read_restspec(self, obj):
+        self.address = obj['base_address']
+
+    @classmethod
+    def from_restspec_obj(cls, obj):
+        ret = cls('')
+        ret._read_restspec(obj)
+        return ret
+
+    @classmethod
+    def from_restspec_file(cls, file_or_name):
+        try:
+            file_or_name.read
+        except AttributeError:
+            f = open(file_or_name)
+        else:
+            f = file_or_name
+        return cls.from_restspec_obj(json.load(f))
+
+    def __repr__(self):
+        return "<SiteFactory [{}]>".format(self.address)
 
     def __call__(self, session=None, proxy=None):
         """
@@ -84,3 +110,26 @@ class Site:
         return self.session.request(method, url, *args, **kwargs)
 
 
+class RestSpecFinder(importlib.abc.MetaPathFinder):
+    def install(self):
+        sys.meta_path.append(self)
+
+    def find_spec(self, fullname, path, target=None):
+        _, _, mod = fullname.rpartition('.')
+        modfile = mod + '.restspec.json'
+        for p in path:
+            filename = os.path.join(p, modfile)
+            if os.path.exists(filename):
+                return importlib.machinery.ModuleSpec(
+                    fullname, RestSpecLoader(), origin=filename)
+        return None
+
+
+class RestSpecLoader(importlib.abc.Loader):
+    def create_module(self, spec):
+        return SiteFactory('')
+
+    def exec_module(self, site_factory):
+        site_factory._read_restspec(
+            json.load(open(site_factory.__spec__.origin)))
+        return site_factory
