@@ -3,6 +3,7 @@ import aiohttp
 import json
 import importlib.abc
 import os.path
+import re
 
 from .util import metafunc, getattribute_common, ThrowOnUnusedKeys
 from .request import Request, RequestBuilder
@@ -16,6 +17,7 @@ class NeverMatch(object):
 
 class SiteFactory:
     permalink_attr = NeverMatch()
+    permalink_hint = lambda key, obj: None
 
     def __init__(self, address):
         self.address = address.rstrip('/')
@@ -23,6 +25,41 @@ class SiteFactory:
     def _read_restspec(self, f):
         with json.load(f, object_hook=ThrowOnUnusedKeys) as cfg:
             self.address = cfg['base_address'].rstrip('/')
+            self.permalink_attr, self.permalink_hint = self._parse_matcher(
+                    cfg.get('permalink_attribute'))
+
+    def _no_hint(self, key, obj):
+        return None
+
+    def _parse_matcher(self, value):
+        if value is None:
+            return NeverMatch(), self._no_hint
+        if value == 'any':
+            return re.compile(''), self._no_hint
+        hint = value.get('hint')
+        hint_func = lambda k, o: hint
+        with value:
+            try:
+                pat = value['pattern']
+            except KeyError:
+                pass
+            else:
+                return (
+                    re.compile(pat),
+                    hint_func if hint else self._no_hint
+                    )
+            prefix = value.get('prefix')
+            suffix = value.get('suffix')
+            if prefix is None and suffix is None:
+                raise ValueError('Need at least a prefix and/or suffix, '
+                                 'or a pattern')
+            prefix = prefix or ''
+            suffix = suffix or ''
+            hint = (prefix + '{}' + suffix) if not hint else hint
+            return (
+                re.compile('^{}.*{}$'.format(re.escape(prefix),
+                                             re.escape(suffix))),
+                hint_func)
 
     @classmethod
     def from_restspec_file(cls, file_or_name):

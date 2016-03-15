@@ -95,7 +95,10 @@ class ThrowOnUnusedKeys(abc.Mapping):
         return len(self._value)
 
     def __getitem__(self, key):
-        self._unused_keys.remove(key)
+        try:
+            self._unused_keys.remove(key)
+        except AttributeError:
+            pass
         return self._value[key]
 
     def __iter__(self):
