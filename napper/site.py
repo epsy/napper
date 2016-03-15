@@ -4,7 +4,7 @@ import json
 import importlib.abc
 import os.path
 
-from .util import metafunc, getattribute_common
+from .util import metafunc, getattribute_common, ThrowOnUnusedKeys
 from .request import Request, RequestBuilder
 from .errors import CrossOriginRequestError
 
@@ -13,14 +13,9 @@ class SiteFactory:
     def __init__(self, address):
         self.address = address.rstrip('/')
 
-    def _read_restspec(self, obj):
-        self.address = obj['base_address']
-
-    @classmethod
-    def from_restspec_obj(cls, obj):
-        ret = cls('')
-        ret._read_restspec(obj)
-        return ret
+    def _read_restspec(self, f):
+        with json.load(f, object_hook=ThrowOnUnusedKeys) as cfg:
+            self.address = cfg['base_address']
 
     @classmethod
     def from_restspec_file(cls, file_or_name):
@@ -30,7 +25,9 @@ class SiteFactory:
             f = open(file_or_name)
         else:
             f = file_or_name
-        return cls.from_restspec_obj(json.load(f))
+        ret = cls('')
+        ret._read_restspec(f)
+        return ret
 
     def __repr__(self):
         return "<SiteFactory [{}]>".format(self.address)
@@ -130,6 +127,5 @@ class RestSpecLoader(importlib.abc.Loader):
         return SiteFactory('')
 
     def exec_module(self, site_factory):
-        site_factory._read_restspec(
-            json.load(open(site_factory.__spec__.origin)))
+        site_factory._read_restspec(open(site_factory.__spec__.origin))
         return site_factory
