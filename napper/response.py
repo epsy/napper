@@ -77,6 +77,10 @@ class ResponseObject(collections.abc.Mapping):
         self.origin = origin
 
     @metafunc
+    def __repr__(self):
+        return repr(self.value)
+
+    @metafunc
     def __len__(self):
         return len(self.value)
 

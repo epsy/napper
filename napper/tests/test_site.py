@@ -4,6 +4,7 @@
 import io
 
 from ..site import SiteFactory
+from ..errors import UnknownParameters
 from .util import AioTests
 
 
@@ -17,14 +18,14 @@ class SiteTests(AioTests):
         self.assertTrue(se.session.closed)
 
 
-class ConfigTEsts(AioTests):
+class ConfigTests(AioTests):
     def sf_from_restspec(self, text):
         sf = SiteFactory('')
         sf._read_restspec(io.StringIO(text))
         return sf
 
     def test_unknown_params(self):
-        with self.assertRaises(ValueError):
+        with self.assertWarns(UnknownParameters):
             self.sf_from_restspec("""
                 {"base_address": "http://some.addressa", "invalidoption": 0}
                 """)

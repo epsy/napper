@@ -15,3 +15,7 @@ class CrossOriginRequestError(Exception):
     def __str__(self):
         return '{0.origin} cannot {1} {0.request}'.format(
             self, self.method.upper())
+
+
+class UnknownParameters(UserWarning):
+    pass

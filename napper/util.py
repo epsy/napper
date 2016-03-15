@@ -4,6 +4,9 @@
 import asyncio
 import functools
 from collections import abc
+import warnings
+
+from .errors import UnknownParameters
 
 
 def getattribute_common(func):
@@ -114,4 +117,5 @@ class ThrowOnUnusedKeys(abc.Mapping):
         if typ is not None:
             return
         if self._unused_keys:
-            raise ValueError("Unknown parameters: " + ', '.join(self._unused_keys))
+            warnings.warn("Unknown parameters: " + ', '.join(self._unused_keys),
+                          UnknownParameters)
