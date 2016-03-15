@@ -9,7 +9,14 @@ from .request import Request, RequestBuilder
 from .errors import CrossOriginRequestError
 
 
+class NeverMatch(object):
+    def match(self, haystack):
+        return None
+
+
 class SiteFactory:
+    permalink_attr = NeverMatch()
+
     def __init__(self, address):
         self.address = address.rstrip('/')
 
@@ -74,6 +81,7 @@ class Site:
 
     def __init__(self, factory, session, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.factory = factory
         self.address = factory.address
         self.session = session
 
@@ -105,6 +113,10 @@ class Site:
         if not self.is_same_origin(url):
             raise CrossOriginRequestError(self, method, url, (), {})
         return self.session.request(method, url, *args, **kwargs)
+
+    @metafunc
+    def is_permalink_attr(self, key, item):
+        return self.factory.permalink_attr.match(key) is not None
 
 
 class RestSpecFinder(importlib.abc.MetaPathFinder):

@@ -1,6 +1,8 @@
 # napper -- A REST Client for Python
 # Copyright (C) 2016 by Yann Kaiser and contributors.
 # See AUTHORS and COPYING for details.
+import re
+
 from .util import AioTests
 from .. import CrossOriginRequestError
 from ..request import Request
@@ -152,18 +154,21 @@ class RequestTests(AioTests):
             self.assertEqual((await self.req[1][1]), 'xyz')
 
     async def test_follow_request(self):
+        util.m(self.site).factory.permalink_attr = re.compile('^thing$')
         with self.text_responses(
                 ('{"thing": "http://www.example.org/other_res"}', 200),
                 ('"spam"', 200)):
             self.assertEqual((await self.req.thing.get()), 'spam')
 
     async def test_follow_request_attr(self):
+        util.m(self.site).factory.permalink_attr = re.compile('^thing$')
         with self.text_responses(
                 ('{"thing": "http://www.example.org/other_res"}', 200),
                 ('{"ham": "spam"}', 200)):
             self.assertEqual((await self.req.thing.get().ham), 'spam')
 
     async def test_follow_xsite(self):
+        util.m(self.site).factory.permalink_attr = re.compile('^thing$')
         with self.text_response('{"thing": "http://www.example.com/"}'):
             nextreq = await self.req.thing
         with self.assertRaises(CrossOriginRequestError):

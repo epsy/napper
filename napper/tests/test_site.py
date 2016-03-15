@@ -8,11 +8,6 @@ from .util import AioTests
 
 
 class SiteTests(AioTests):
-    def sf_from_restspec(self, text):
-        sf = SiteFactory('')
-        sf._read_restspec(io.StringIO(text))
-        return sf
-
     def test_close_session(self):
         sf = SiteFactory('http://www.example.org/')
         se = sf()
@@ -20,6 +15,13 @@ class SiteTests(AioTests):
         with se:
             self.assertFalse(se.session.closed)
         self.assertTrue(se.session.closed)
+
+
+class ConfigTEsts(AioTests):
+    def sf_from_restspec(self, text):
+        sf = SiteFactory('')
+        sf._read_restspec(io.StringIO(text))
+        return sf
 
     def test_unknown_params(self):
         with self.assertRaises(ValueError):

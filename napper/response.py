@@ -7,7 +7,7 @@ import collections.abc
 from functools import partial
 
 from . import request
-from .util import requestmethods, m, rag, getattribute_dict
+from .util import requestmethods, rag, getattribute_dict, metafunc
 
 
 @asyncio.coroutine
@@ -71,13 +71,18 @@ class PermalinkString(str):
         return request.Request(site, method, self)
 
 
-class ResponseObject(dict):
-    def __new__(cls, *args, origin, **kwargs):
-        return super().__new__(cls, *args, **kwargs)
-
-    def __init__(self, *args, origin, **kwargs):
-        super().__init__(*args, **kwargs)
+class ResponseObject(collections.abc.Mapping):
+    def __init__(self, value, origin):
+        self.value = value
         self.origin = origin
+
+    @metafunc
+    def __len__(self):
+        return len(self.value)
+
+    @metafunc
+    def __iter__(self):
+        return iter(self.value)
 
     @getattribute_dict
     def __getattribute__(self, name):
@@ -86,5 +91,11 @@ class ResponseObject(dict):
         except KeyError:
             raise AttributeError(name)
 
+    @metafunc
     def __getitem__(self, name):
-        return upgrade_object(super().__getitem__(name), m(self).origin)
+        item = self.value[name]
+        if isinstance(item, str):
+            if self.origin.site.is_permalink_attr(name, item):
+                return PermalinkString(item, origin=self.origin)
+            return item
+        return upgrade_object(item, self.origin)

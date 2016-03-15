@@ -56,7 +56,7 @@ class AioTests(unittest.TestCase, metaclass=AioTestsMeta):
 
     def setUp(self):
         super().setUp()
-        factory = SiteFactory('http://www.example.org')
+        self.sfactory = factory = SiteFactory('http://www.example.org')
         self.site = Site(factory, factory())
         self.req = self.site.res.get()
 
