@@ -35,3 +35,8 @@ class ConfigTests(AioTests):
             {"base_address": "http://an.address.com"}
         """)
         self.assertEqual(sf.address, "http://an.address.com")
+
+        sf = self.sf_from_restspec("""
+            {"base_address": "http://an.address.com/"}
+        """)
+        self.assertEqual(sf.address, "http://an.address.com")

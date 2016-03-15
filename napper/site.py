@@ -22,7 +22,7 @@ class SiteFactory:
 
     def _read_restspec(self, f):
         with json.load(f, object_hook=ThrowOnUnusedKeys) as cfg:
-            self.address = cfg['base_address']
+            self.address = cfg['base_address'].rstrip('/')
 
     @classmethod
     def from_restspec_file(cls, file_or_name):
