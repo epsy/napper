@@ -93,7 +93,15 @@ class ResponseObject(collections.abc.Mapping):
         try:
             return self[name]
         except KeyError:
-            raise AttributeError(name)
+            name_hint = (
+                rag(self, 'origin')
+                .site.permalink_hint(name, rag(self, 'value')))
+            if name_hint is None:
+                raise AttributeError(name) from None
+            try:
+                return self[name_hint]
+            except KeyError:
+                raise AttributeError(name) from None
 
     @metafunc
     def __getitem__(self, name):

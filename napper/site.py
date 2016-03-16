@@ -17,7 +17,6 @@ class NeverMatch(object):
 
 class SiteFactory:
     permalink_attr = NeverMatch()
-    permalink_hint = lambda key, obj: None
 
     def __init__(self, address):
         self.address = address.rstrip('/')
@@ -89,6 +88,9 @@ class SiteFactory:
             session = aiohttp.ClientSession(connector=conn)
         return SiteSession(self, session)
 
+    def permalink_hint(self, key, obj):
+        return None
+
 
 class SiteSession:
     def __init__(self, factory, session):
@@ -154,6 +156,10 @@ class Site:
     @metafunc
     def is_permalink_attr(self, key, item):
         return self.factory.permalink_attr.match(key) is not None
+
+    @metafunc
+    def permalink_hint(self, key, obj):
+        return self.factory.permalink_hint(key, obj)
 
 
 class RestSpecFinder(importlib.abc.MetaPathFinder):

@@ -97,3 +97,12 @@ class JsonResponseTests(AioTests):
                 self.assertEqual(util.m(req).url,
                                   'http://www.example.org/snakes')
                 self.assertEqual(util.m(req).method, method.upper())
+
+    async def test_permalink_hint(self):
+        self.sfactory.permalink_attr = re.compile('^.*_url$')
+        self.sfactory.permalink_hint = lambda key, obj: key + '_url'
+        resp = await self.make_response()
+        req = resp.snakes.get()
+        self.assertIsInstance(req, request.Request)
+        self.assertEqual(util.m(req).url, 'http://www.example.org/snakes')
+        self.assertEqual(util.m(req).method, 'GET')
