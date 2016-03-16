@@ -7,6 +7,7 @@ import inspect
 from functools import wraps
 import asyncio
 import json
+import warnings
 
 from ..util import rag
 from ..site import Site, SiteFactory
@@ -36,7 +37,8 @@ def _fut_result(result):
 def _make_asyncwrapper(func):
     @wraps(func)
     def asyncwrapper(self):
-        asyncio.get_event_loop().run_until_complete(func(self))
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(func(self))
     return asyncwrapper
 
 
@@ -50,6 +52,8 @@ class AioTestsMeta(type):
 
 
 class AioTests(unittest.TestCase, metaclass=AioTestsMeta):
+    unclosed_ignored = False
+
     def make_site(self, address='http://www.example.org'):
         factory = SiteFactory(address)
         return factory()
@@ -64,6 +68,10 @@ class AioTests(unittest.TestCase, metaclass=AioTestsMeta):
         super().setUp()
         session = rag(self.site, 'session')
         session.close()
+        if not self.unclosed_ignored:
+            AioTests.unclosed_ignored = True
+            warnings.filterwarnings(
+                'ignore', 'unclosed event loop', ResourceWarning)
 
     def text_response(self, text, status=200, *, req=None):
         return self.text_responses((text, status), req=req)
