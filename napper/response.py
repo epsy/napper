@@ -7,7 +7,7 @@ import collections.abc
 from functools import partial
 
 from . import request
-from .util import requestmethods, rag, getattribute_dict, metafunc
+from .util import requestmethods, rag, getattribute_dict, metafunc, METHODS
 
 
 @asyncio.coroutine
@@ -90,12 +90,21 @@ class ResponseObject(collections.abc.Mapping):
 
     @getattribute_dict
     def __getattribute__(self, name):
+        origin = rag(self, 'origin')
+        site = origin.site
+        if name in METHODS or name == 'request':
+            plink_name = site.factory.permalink_obj(self)
+            try:
+                addr = self[plink_name]
+            except KeyError:
+                pass
+            else:
+                return getattr(PermalinkString(addr, origin=origin), name)
         try:
             return self[name]
         except KeyError:
             name_hint = (
-                rag(self, 'origin')
-                .site.permalink_hint(name, rag(self, 'value')))
+                site.permalink_hint(name, rag(self, 'value')))
             if name_hint is None:
                 raise AttributeError(name) from None
             try:

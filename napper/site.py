@@ -26,6 +26,8 @@ class SiteFactory:
             self.address = cfg['base_address'].rstrip('/')
             self.permalink_attr, self.permalink_hint = \
                 self._parse_matcher(cfg.get('permalink_attribute'))
+            obj_attr = cfg.get('permalink_object')
+            self.permalink_obj = lambda o: obj_attr
 
     def _no_hint(self, key, obj):
         return None
@@ -89,6 +91,9 @@ class SiteFactory:
         return SiteSession(self, session)
 
     def permalink_hint(self, key, obj):
+        return None
+
+    def permalink_obj(self, key):
         return None
 
 

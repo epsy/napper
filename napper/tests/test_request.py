@@ -202,3 +202,13 @@ class RequestTests(AioTests):
         self.assertIsInstance(req2, Request)
         self.assertAttrEqual(req2, 'url', "http://www.example.org/eggs")
         self.assertIs(util.rag(req2, 'site')._DemagifiedObject__real_object, self.site)
+
+    async def test_permalink_object(self):
+        self.read_restspec(permalink_object='permalink')
+        req = self.site.path.get()
+        with self.text_response('{"permalink": "http://www.example.org/eggs"}'):
+            resp = await req
+        req2 = resp.get()
+        self.assertIsInstance(req2, Request)
+        self.assertAttrEqual(req2, 'url', "http://www.example.org/eggs")
+        self.assertIs(util.rag(req2, 'site')._DemagifiedObject__real_object, self.site)
