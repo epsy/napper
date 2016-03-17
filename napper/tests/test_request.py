@@ -6,21 +6,11 @@ import re
 from .util import AioTests
 from .. import CrossOriginRequestError
 from ..request import Request
+from ..response import PermalinkString
 from .. import util
 
 
 class RequestBuilderTests(AioTests):
-    def assertAttrEqual(self, obj, attr, exp):
-        self.assertEqual(util.rag(obj, attr), exp)
-
-    def assertIEqual(self, left, right):
-        self.assertEqual(left.lower(), right.lower())
-
-    def assertRequestEqual(self, req, exp_method, exp_url):
-        self.assertIsInstance(req, Request)
-        self.assertIEqual(util.rag(req, 'method'), exp_method)
-        self.assertEqual(util.rag(req, 'url'), exp_url)
-
     def test_site(self):
         with self.make_site('http://www.example.org/') as site:
             self.assertIs(util.rag(site, 'site'), site)
@@ -198,3 +188,17 @@ class RequestTests(AioTests):
             self.assertRequestMade(
                 mock, 'POST', 'http://www.example.org/path',
                 params={'param': "val"}, data={'spam': 'ham', 'eggs': 42})
+
+    async def test_permalink_attr(self):
+        self.read_restspec(permalink_attribute={'suffix': '_url'})
+        req = self.site.path.get()
+        with self.text_response('{"eggs_url": "http://www.example.org/eggs"}'):
+            resp = await req
+        perma = resp.eggs
+        self.assertIsInstance(perma, PermalinkString)
+        self.assertIs(util.rag(perma, 'origin')._DemagifiedObject__real_object, req)
+        self.assertEqual(perma, "http://www.example.org/eggs")
+        req2 = perma.get()
+        self.assertIsInstance(req2, Request)
+        self.assertAttrEqual(req2, 'url', "http://www.example.org/eggs")
+        self.assertIs(util.rag(req2, 'site')._DemagifiedObject__real_object, self.site)

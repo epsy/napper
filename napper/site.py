@@ -24,8 +24,8 @@ class SiteFactory:
     def _read_restspec(self, f):
         with json.load(f, object_hook=ThrowOnUnusedKeys) as cfg:
             self.address = cfg['base_address'].rstrip('/')
-            self.permalink_attr, self.permalink_hint = self._parse_matcher(
-                    cfg.get('permalink_attribute'))
+            self.permalink_attr, self.permalink_hint = \
+                self._parse_matcher(cfg.get('permalink_attribute'))
 
     def _no_hint(self, key, obj):
         return None
@@ -36,7 +36,7 @@ class SiteFactory:
         if value == 'any':
             return re.compile(''), self._no_hint
         hint = value.get('hint')
-        hint_func = lambda k, o: hint
+        hint_func = lambda k, o: hint.format(k)
         with value:
             try:
                 pat = value['pattern']

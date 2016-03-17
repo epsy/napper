@@ -8,9 +8,11 @@ from functools import wraps
 import asyncio
 import json
 import warnings
+import io
 
 from ..util import rag
 from ..site import Site, SiteFactory
+from ..request import Request
 
 
 class FakeTextResponse(object):
@@ -54,6 +56,20 @@ class AioTestsMeta(type):
 class AioTests(unittest.TestCase, metaclass=AioTestsMeta):
     unclosed_ignored = False
 
+    def assertAttrEqual(self, obj, attr, exp):
+        self.assertEqual(rag(obj, attr), exp)
+
+    def assertAttrIs(self, obj, attr, exp):
+        self.assertIs(rag(obj, attr), exp)
+
+    def assertIEqual(self, left, right):
+        self.assertEqual(left.lower(), right.lower())
+
+    def assertRequestEqual(self, req, exp_method, exp_url):
+        self.assertIsInstance(req, Request)
+        self.assertIEqual(rag(req, 'method'), exp_method)
+        self.assertEqual(rag(req, 'url'), exp_url)
+
     def make_site(self, address='http://www.example.org'):
         factory = SiteFactory(address)
         return factory()
@@ -72,6 +88,10 @@ class AioTests(unittest.TestCase, metaclass=AioTestsMeta):
             AioTests.unclosed_ignored = True
             warnings.filterwarnings(
                 'ignore', 'unclosed event loop', ResourceWarning)
+
+    def read_restspec(self, **spec):
+        spec.setdefault('base_address', 'http://www.example.org')
+        self.sfactory._read_restspec(io.StringIO(json.dumps(spec)))
 
     def text_response(self, text, status=200, *, req=None):
         return self.text_responses((text, status), req=req)
