@@ -94,15 +94,15 @@ class AioTests(unittest.TestCase, metaclass=AioTestsMeta):
         self.sfactory._read_restspec(io.StringIO(json.dumps(spec)))
 
     def text_response(self, text, status=200, *, req=None):
-        return self.text_responses((text, status), req=req)
+        return self.text_responses(text, final_status=status, req=req)
 
-    def text_responses(self, *text_status_pairs, req=None):
+    def text_responses(self, *responses, final_status=200, req=None):
         if req is None:
             req = self.req
         site = rag(req, 'site')
         return patch.object(site.session, 'request', side_effect=(
-            _fut_result(FakeTextResponse(text, status))
-            for text, status in text_status_pairs
+            _fut_result(FakeTextResponse(text, final_status if not i else 200))
+            for i, text in enumerate(responses, 1 - len(responses))
         ))
 
     def assertRequestMade(self, mock, method, url, params={}, **kwargs):

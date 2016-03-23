@@ -146,15 +146,14 @@ class RequestTests(AioTests):
     async def test_follow_request(self):
         util.m(self.site).factory.permalink_attr = re.compile('^thing$')
         with self.text_responses(
-                ('{"thing": "http://www.example.org/other_res"}', 200),
-                ('"spam"', 200)):
+                '{"thing": "http://www.example.org/other_res"}', '"spam"'):
             self.assertEqual((await self.req.thing.get()), 'spam')
 
     async def test_follow_request_attr(self):
         util.m(self.site).factory.permalink_attr = re.compile('^thing$')
         with self.text_responses(
-                ('{"thing": "http://www.example.org/other_res"}', 200),
-                ('{"ham": "spam"}', 200)):
+                '{"thing": "http://www.example.org/other_res"}',
+                '{"ham": "spam"}'):
             self.assertEqual((await self.req.thing.get().ham), 'spam')
 
     async def test_follow_xsite(self):
