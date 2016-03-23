@@ -44,7 +44,7 @@ def _make_asyncwrapper(func):
     return asyncwrapper
 
 
-class AioTestsMeta(type):
+class TestsMeta(type):
     def __new__(cls, name, bases, members):
         for name, value in dict(members).items():
             if name.startswith('test_') and inspect.iscoroutinefunction(value):
@@ -53,7 +53,7 @@ class AioTestsMeta(type):
         return type.__new__(cls, name, bases, members)
 
 
-class AioTests(unittest.TestCase, metaclass=AioTestsMeta):
+class Tests(unittest.TestCase, metaclass=TestsMeta):
     unclosed_ignored = False
 
     def assertAttrEqual(self, obj, attr, exp):
@@ -85,7 +85,7 @@ class AioTests(unittest.TestCase, metaclass=AioTestsMeta):
         session = rag(self.site, 'session')
         session.close()
         if not self.unclosed_ignored:
-            AioTests.unclosed_ignored = True
+            Tests.unclosed_ignored = True
             warnings.filterwarnings(
                 'ignore', 'unclosed event loop', ResourceWarning)
 

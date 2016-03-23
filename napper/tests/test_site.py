@@ -7,10 +7,10 @@ import re
 
 from ..site import SiteFactory
 from ..errors import UnknownParameters
-from .util import AioTests
+from .util import Tests
 
 
-class SiteTests(AioTests):
+class SiteTests(Tests):
     def test_close_session(self):
         sf = SiteFactory('http://www.example.org/')
         se = sf()
@@ -20,7 +20,7 @@ class SiteTests(AioTests):
         self.assertTrue(se.session.closed)
 
 
-class ConfigTests(AioTests):
+class ConfigTests(Tests):
     def sf_from_restspec(self, **obj):
         obj.setdefault('base_address', 'http://www.example.org')
         sf = SiteFactory('')

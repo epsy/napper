@@ -3,7 +3,7 @@
 # See AUTHORS and COPYING for details.
 import re
 
-from .util import AioTests
+from .util import Tests
 from .. import request, response, util
 
 
@@ -24,7 +24,7 @@ def consume(ito):
         return e.value
 
 
-class JsonResponseTests(AioTests):
+class JsonResponseTests(Tests):
     json_object = """
     {
         "num": 3,

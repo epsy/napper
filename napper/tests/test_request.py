@@ -3,14 +3,14 @@
 # See AUTHORS and COPYING for details.
 import re
 
-from .util import AioTests
+from .util import Tests
 from .. import CrossOriginRequestError
 from ..request import Request
 from ..response import PermalinkString
 from .. import util
 
 
-class RequestBuilderTests(AioTests):
+class RequestBuilderTests(Tests):
     def test_site(self):
         with self.make_site('http://www.example.org/') as site:
             self.assertIs(util.rag(site, 'site'), site)
@@ -75,7 +75,7 @@ class RequestBuilderTests(AioTests):
             self.assertEqual(ureq_attr.address, 'http://www.example.org/apath')
 
 
-class RequestTests(AioTests):
+class RequestTests(Tests):
     async def test_values(self):
         resp = await self.request('{"a": 42, "ham": ["eggs", "spam"]}')
         self.assertEqual(resp['a'], 42)
