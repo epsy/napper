@@ -46,10 +46,10 @@ def _make_asyncwrapper(func):
 
 class TestsMeta(type):
     def __new__(cls, name, bases, members):
-        for name, value in dict(members).items():
-            if name.startswith('test_') and inspect.iscoroutinefunction(value):
-                members['async_' + name] = value
-                members[name] = _make_asyncwrapper(value)
+        for key, value in dict(members).items():
+            if key.startswith('test_') and inspect.iscoroutinefunction(value):
+                members['async_' + key] = value
+                members[key] = _make_asyncwrapper(value)
         return type.__new__(cls, name, bases, members)
 
 
