@@ -76,18 +76,14 @@ class Tests(unittest.TestCase, metaclass=TestsMeta):
 
     def setUp(self):
         super().setUp()
-        self.sfactory = factory = SiteFactory('http://www.example.org')
-        self.site = Site(factory, factory())
-        self.req = self.site.res.get()
-
-    def tearDown(self):
-        super().setUp()
-        session = rag(self.site, 'session')
-        session.close()
         if not self.unclosed_ignored:
             Tests.unclosed_ignored = True
             warnings.filterwarnings(
                 'ignore', 'unclosed event loop', ResourceWarning)
+        self.sfactory = factory = SiteFactory('http://www.example.org')
+        self.site = Site(factory, factory())
+        self.addCleanup(rag(self.site, 'session').close)
+        self.req = self.site.res.get()
 
     def read_restspec(self, **spec):
         spec.setdefault('base_address', 'http://www.example.org')
