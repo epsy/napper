@@ -6,7 +6,7 @@ import json
 import collections.abc
 from functools import partial
 
-from . import request
+from . import request, restspec
 from .util import requestmethods, rag, getattribute_dict, metafunc, METHODS
 
 
@@ -14,22 +14,22 @@ from .util import requestmethods, rag, getattribute_dict, metafunc, METHODS
 def convert_json(request, response):
     return upgrade_object(
         json.loads((yield from response.text()),
-                   object_hook=partial(ResponseObject, origin=request)),
+                   object_hook=partial(ResponseObject, request=request)),
         request)
 
 
-def upgrade_object(val, origin):
+def upgrade_object(val, request):
     if isinstance(val, str):
-        return PermalinkString(val, origin=origin)
+        return PermalinkString(val, request=request)
     elif isinstance(val, list):
-        return ResponseList(val, origin=origin)
+        return ResponseList(val, request=request)
     else:
         return val
 
 
 class ResponseList(collections.abc.Sequence):
-    def __init__(self, val, origin):
-        self.origin = origin
+    def __init__(self, val, request):
+        self.request = request
         self.val = val
 
     def __repr__(self):
@@ -61,20 +61,21 @@ class ResponseListIterator:
 
 @requestmethods
 class PermalinkString(str):
-    def __new__(cls, *args, origin, **kwargs):
+    def __new__(cls, *args, request, **kwargs):
         ret = super().__new__(cls, *args, **kwargs)
-        ret.origin = origin
+        if isinstance(request, type(restspec)): raise TypeError
+        ret.origin_request = request
         return ret
 
     def request(self, method, *args, **kwargs):
-        site = rag(self.origin, 'site')
+        site = rag(self.origin_request, 'site')
         return request.Request(site, method, self)
 
 
 class ResponseObject(collections.abc.Mapping):
-    def __init__(self, value, origin):
+    def __init__(self, value, request):
         self.value = value
-        self.origin = origin
+        self.request = request
 
     @metafunc
     def __repr__(self):
@@ -89,26 +90,28 @@ class ResponseObject(collections.abc.Mapping):
         return iter(self.value)
 
     @getattribute_dict
+    @metafunc
     def __getattribute__(self, name):
-        origin = rag(self, 'origin')
-        site = origin.site
+        site = self.request.site
         if name in METHODS or name == 'request':
-            plink_name = site.factory.permalink_obj(self)
+            plink_name = site.spec.permalink_hint(self._real_object)
             try:
-                addr = self[plink_name]
+                addr = self._real_object[plink_name]
             except KeyError:
                 pass
             else:
-                return getattr(PermalinkString(addr, origin=origin), name)
+                return getattr(PermalinkString(addr, request=self.request),
+                               name)
         try:
-            return self[name]
+            return self._real_object[name]
         except KeyError:
-            name_hint = (
-                site.permalink_hint(name, rag(self, 'value')))
-            if name_hint is None:
+            try:
+                name_hint = site.spec.is_permalink_attr.hint(
+                    name, self._real_object)
+            except restspec.NoValue:
                 raise AttributeError(name) from None
             try:
-                return self[name_hint]
+                return self._real_object[name_hint]
             except KeyError:
                 raise AttributeError(name) from None
 
@@ -116,7 +119,8 @@ class ResponseObject(collections.abc.Mapping):
     def __getitem__(self, name):
         item = self.value[name]
         if isinstance(item, str):
-            if self.origin.site.is_permalink_attr(name, item):
-                return PermalinkString(item, origin=self.origin)
+            if self.request.site.spec.is_permalink_attr(
+                    name, item, self._real_object):
+                return PermalinkString(item, request=self.request)
             return item
-        return upgrade_object(item, self.origin)
+        return upgrade_object(item, self.request)

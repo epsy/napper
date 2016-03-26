@@ -8,6 +8,7 @@ from .util import m, rag, METHODS, metafunc, getattribute_common
 class RequestBuilder(object):
     def __init__(self, site, path):
         self.site = site
+        self.spec = rag(site, 'spec')
         self.path = path
 
     @metafunc

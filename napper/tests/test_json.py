@@ -4,7 +4,7 @@
 import re
 
 from .util import Tests
-from .. import request, response, util
+from .. import request, response, util, restspec
 
 
 
@@ -88,7 +88,9 @@ class JsonResponseTests(Tests):
             self.r.snakes_url.get()
 
     async def test_permalink(self):
-        self.sfactory.permalink_attr = re.compile('^.*_url$')
+        r = re.compile('^.*_url$')
+        m = self.sfactory.spec.is_permalink_attr = lambda key, *a: r.match(key)
+        m.hint = restspec.no_value
         resp = await self.make_response()
         for method in ['get', 'post', 'put', 'delete']:
             with self.subTest(method=method):
@@ -99,8 +101,9 @@ class JsonResponseTests(Tests):
                 self.assertEqual(util.m(req).method, method.upper())
 
     async def test_permalink_hint(self):
-        self.sfactory.permalink_attr = re.compile('^.*_url$')
-        self.sfactory.permalink_hint = lambda key, obj: key + '_url'
+        r = re.compile('^.*_url$')
+        m = self.sfactory.spec.is_permalink_attr = lambda key, *a: r.match(key)
+        m.hint = lambda key, *a: key + '_url'
         resp = await self.make_response()
         req = resp.snakes.get()
         self.assertIsInstance(req, request.Request)

@@ -7,24 +7,27 @@ from .util import Tests
 from .. import CrossOriginRequestError
 from ..request import Request
 from ..response import PermalinkString
-from .. import util
+from .. import util, restspec
 
 
 class RequestBuilderTests(Tests):
     def test_site(self):
         with self.make_site('http://www.example.org/') as site:
             self.assertIs(util.rag(site, 'site'), site)
-            self.assertAttrEqual(site, 'address', 'http://www.example.org')
+            self.assertEqual(util.rag(site, 'spec').address,
+                             'http://www.example.org')
 
     def test_site_deep(self):
         with self.make_site('http://www.example.org/apath') as site:
             self.assertIs(util.rag(site, 'site'), site)
-            self.assertAttrEqual(site, 'address', 'http://www.example.org/apath')
+            self.assertEqual(util.rag(site, 'spec').address,
+                             'http://www.example.org/apath')
 
     def test_site_deep2(self):
         with self.make_site('http://www.example.org/apath/subpath') as site:
             self.assertIs(util.rag(site, 'site'), site)
-            self.assertAttrEqual(site, 'address', 'http://www.example.org/apath/subpath')
+            self.assertEqual(util.rag(site, 'spec').address,
+                             'http://www.example.org/apath/subpath')
 
     def test_get_root(self):
         self.assertRequestEqual(self.site.get(), 'get', 'http://www.example.org/')
@@ -65,10 +68,10 @@ class RequestBuilderTests(Tests):
             subp = site.subpath
             sreq = subp.get()
             ureq = subp.get()
-            site_attr = util.rag(subp, 'site')
-            subp_attr = util.rag(subp, 'site')
-            sreq_attr = util.rag(sreq, 'site')
-            ureq_attr = util.rag(ureq, 'site')
+            site_attr = util.rag(subp, 'site').spec
+            subp_attr = util.rag(subp, 'site').spec
+            sreq_attr = util.rag(sreq, 'site').spec
+            ureq_attr = util.rag(ureq, 'site').spec
             self.assertEqual(site_attr.address, 'http://www.example.org/apath')
             self.assertEqual(subp_attr.address, 'http://www.example.org/apath')
             self.assertEqual(sreq_attr.address, 'http://www.example.org/apath')
@@ -76,6 +79,11 @@ class RequestBuilderTests(Tests):
 
 
 class RequestTests(Tests):
+    def setUp(self):
+        super().setUp()
+        self.matcher = m = restspec.Matcher()
+        m.pattern = re.compile('^thing$')
+
     async def test_values(self):
         resp = await self.request('{"a": 42, "ham": ["eggs", "spam"]}')
         self.assertEqual(resp['a'], 42)
@@ -144,20 +152,20 @@ class RequestTests(Tests):
             self.assertEqual((await self.req[1][1]), 'xyz')
 
     async def test_follow_request(self):
-        util.m(self.site).factory.permalink_attr = re.compile('^thing$')
+        util.rag(self.site, 'spec').is_permalink_attr = self.matcher
         with self.text_responses(
                 '{"thing": "http://www.example.org/other_res"}', '"spam"'):
             self.assertEqual((await self.req.thing.get()), 'spam')
 
     async def test_follow_request_attr(self):
-        util.m(self.site).factory.permalink_attr = re.compile('^thing$')
+        util.rag(self.site, 'spec').is_permalink_attr = self.matcher
         with self.text_responses(
                 '{"thing": "http://www.example.org/other_res"}',
                 '{"ham": "spam"}'):
             self.assertEqual((await self.req.thing.get().ham), 'spam')
 
     async def test_follow_xsite(self):
-        util.m(self.site).factory.permalink_attr = re.compile('^thing$')
+        util.rag(self.site, 'spec').is_permalink_attr = self.matcher
         with self.text_response('{"thing": "http://www.example.com/"}'):
             nextreq = await self.req.thing
         with self.assertRaises(CrossOriginRequestError):
@@ -195,12 +203,12 @@ class RequestTests(Tests):
             resp = await req
         perma = resp.eggs
         self.assertIsInstance(perma, PermalinkString)
-        self.assertIs(util.rag(perma, 'origin')._DemagifiedObject__real_object, req)
+        self.assertIs(util.rag(perma, 'origin_request')._real_object, req)
         self.assertEqual(perma, "http://www.example.org/eggs")
         req2 = perma.get()
         self.assertIsInstance(req2, Request)
         self.assertAttrEqual(req2, 'url', "http://www.example.org/eggs")
-        self.assertIs(util.rag(req2, 'site')._DemagifiedObject__real_object, self.site)
+        self.assertIs(util.rag(req2, 'site')._real_object, self.site)
 
     async def test_permalink_object(self):
         self.read_restspec(permalink_object='permalink')
@@ -210,4 +218,4 @@ class RequestTests(Tests):
         req2 = resp.get()
         self.assertIsInstance(req2, Request)
         self.assertAttrEqual(req2, 'url', "http://www.example.org/eggs")
-        self.assertIs(util.rag(req2, 'site')._DemagifiedObject__real_object, self.site)
+        self.assertIs(util.rag(req2, 'site')._real_object, self.site)

@@ -1,11 +1,10 @@
 import sys
 import aiohttp
-import json
 import importlib.abc
 import os.path
-import re
 
-from .util import metafunc, getattribute_common, ThrowOnUnusedKeys
+from .util import metafunc, getattribute_common, rag
+from .restspec import RestSpec
 from .request import Request, RequestBuilder
 from .errors import CrossOriginRequestError
 
@@ -15,67 +14,18 @@ class NeverMatch(object):
         return None
 
 
-class SiteFactory:
-    permalink_attr = NeverMatch()
-
-    def __init__(self, address):
-        self.address = address.rstrip('/')
-
-    def _read_restspec(self, f):
-        with json.load(f, object_hook=ThrowOnUnusedKeys) as cfg:
-            self.address = cfg['base_address'].rstrip('/')
-            self.permalink_attr, self.permalink_hint = \
-                self._parse_matcher(cfg.get('permalink_attribute'))
-            obj_attr = cfg.get('permalink_object')
-            self.permalink_obj = lambda o: obj_attr
-
-    def _no_hint(self, key, obj):
-        return None
-
-    def _parse_matcher(self, value):
-        if value is None:
-            return NeverMatch(), self._no_hint
-        if value == 'any':
-            return re.compile(''), self._no_hint
-        hint = value.get('hint')
-        hint_func = lambda k, o: hint.format(k)
-        with value:
-            try:
-                pat = value['pattern']
-            except KeyError:
-                pass
-            else:
-                return (
-                    re.compile(pat),
-                    hint_func if hint else self._no_hint
-                    )
-            prefix = value.get('prefix')
-            suffix = value.get('suffix')
-            if prefix is None and suffix is None:
-                raise ValueError('Need at least a prefix and/or suffix, '
-                                 'or a pattern')
-            prefix = prefix or ''
-            suffix = suffix or ''
-            hint = (prefix + '{}' + suffix) if not hint else hint
-            return (
-                re.compile('^{}.*{}$'.format(re.escape(prefix),
-                                             re.escape(suffix))),
-                hint_func)
+class SessionFactory:
+    def __init__(self, spec):
+        self.spec = spec
 
     @classmethod
-    def from_restspec_file(cls, file_or_name):
-        try:
-            file_or_name.read
-        except AttributeError:
-            f = open(file_or_name)
-        else:
-            f = file_or_name
-        ret = cls('')
-        ret._read_restspec(f)
-        return ret
+    def from_address(cls, address):
+        spec = RestSpec()
+        spec.address = address.rstrip('/')
+        return cls(spec)
 
     def __repr__(self):
-        return "<SiteFactory [{}]>".format(self.address)
+        return "<SessionFactory [{}]>".format(self.address)
 
     def __call__(self, session=None, proxy=None):
         """
@@ -88,7 +38,7 @@ class SiteFactory:
             if proxy is not None:
                 conn = aiohttp.ProxyConnector(proxy=proxy)
             session = aiohttp.ClientSession(connector=conn)
-        return SiteSession(self, session)
+        return Session(self.spec, session)
 
     def permalink_hint(self, key, obj):
         return None
@@ -97,41 +47,30 @@ class SiteFactory:
         return None
 
 
-class SiteSession:
-    def __init__(self, factory, session):
-        self.factory = factory
-        self.session = session
-
-    def __enter__(self):
-        return Site(self.factory, self)
-
-    def __exit__(self, typ, val, tb):
-        self.close()
-
-    def close(self):
-        self.session.close()
-
-    def request(self, *args, **kwargs):
-        return self.session.request(*args, **kwargs)
-
-
 _unset = object()
 
 
-class Site:
+class Session:
     @property
     def site(self):
         return self
 
-    def __init__(self, factory, session, *args, **kwargs):
+    def __init__(self, spec, session, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.factory = factory
-        self.address = factory.address
+        self.spec = spec
         self.session = session
 
     @metafunc
     def __repr__(self):
-        return "<Site [{0.address}]>".format(self)
+        return "<Site [{0.spec.address}]>".format(self)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        rag(self, 'session').close()
+
+    close = __exit__
 
     @metafunc
     def __getitem__(self, name):
@@ -140,31 +79,15 @@ class Site:
     __getattribute__ = getattribute_common(__getitem__)
 
     @metafunc
-    def join_path(self, path):
-        return self.address + '/' + '/'.join(path)
-
-    @metafunc
-    def is_same_origin(self, url):
-        return url.startswith(self.address)
-
-    @metafunc
     def build_request(self, method, path, **kwargs):
-        jpath = self.join_path(path)
+        jpath = self.spec.join_path(path)
         return Request(self, method, jpath, **kwargs)
 
     @metafunc
     def _request(self, method, url, *args, **kwargs):
-        if not self.is_same_origin(url):
+        if not self.spec.is_same_origin(url):
             raise CrossOriginRequestError(self, method, url, (), {})
         return self.session.request(method, url, *args, **kwargs)
-
-    @metafunc
-    def is_permalink_attr(self, key, item):
-        return self.factory.permalink_attr.match(key) is not None
-
-    @metafunc
-    def permalink_hint(self, key, obj):
-        return self.factory.permalink_hint(key, obj)
 
 
 class RestSpecFinder(importlib.abc.MetaPathFinder):
@@ -184,8 +107,8 @@ class RestSpecFinder(importlib.abc.MetaPathFinder):
 
 class RestSpecLoader(importlib.abc.Loader):
     def create_module(self, spec):
-        return SiteFactory('')
+        return SessionFactory(None)
 
-    def exec_module(self, site_factory):
-        site_factory._read_restspec(open(site_factory.__spec__.origin))
-        return site_factory
+    def exec_module(self, session_factory):
+        session_factory.spec = RestSpec.from_file(open(session_factory.__spec__.origin))
+        return session_factory

@@ -11,7 +11,7 @@ import warnings
 import io
 
 from ..util import rag
-from ..site import Site, SiteFactory
+from ..site import SessionFactory
 from ..request import Request
 
 
@@ -71,8 +71,7 @@ class Tests(unittest.TestCase, metaclass=TestsMeta):
         self.assertEqual(rag(req, 'url'), exp_url)
 
     def make_site(self, address='http://www.example.org'):
-        factory = SiteFactory(address)
-        return factory()
+        return SessionFactory.from_address(address)()
 
     def setUp(self):
         super().setUp()
@@ -80,14 +79,15 @@ class Tests(unittest.TestCase, metaclass=TestsMeta):
             Tests.unclosed_ignored = True
             warnings.filterwarnings(
                 'ignore', 'unclosed event loop', ResourceWarning)
-        self.sfactory = factory = SiteFactory('http://www.example.org')
-        self.site = Site(factory, factory())
+        self.sfactory = factory = SessionFactory.from_address(
+                                                    'http://www.example.org')
+        self.site = factory()
         self.addCleanup(rag(self.site, 'session').close)
         self.req = self.site.res.get()
 
     def read_restspec(self, **spec):
         spec.setdefault('base_address', 'http://www.example.org')
-        self.sfactory._read_restspec(io.StringIO(json.dumps(spec)))
+        self.sfactory.spec._read_spec_file(io.StringIO(json.dumps(spec)))
 
     def text_response(self, text, status=200, *, req=None):
         return self.text_responses(text, final_status=status, req=req)
