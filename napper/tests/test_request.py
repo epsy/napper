@@ -5,7 +5,7 @@ import re
 
 from .util import Tests
 from .. import CrossOriginRequestError
-from ..request import Request
+from ..request import Request, SessionFactory
 from ..response import PermalinkString
 from .. import util, restspec
 
@@ -234,3 +234,14 @@ class RequestTests(Tests):
             async for item in req:
                 lis.append(item)
         self.assertEqual(lis, [1, 2, 3, 4, 5, 6])
+
+
+class SiteTests(Tests):
+    def test_close_session(self):
+        factory = SessionFactory.from_address('http://www.example.org/')
+        session = factory()
+        ah_session = util.rag(session, 'session')
+        self.assertFalse(ah_session.closed)
+        with session:
+            self.assertFalse(ah_session.closed)
+        self.assertTrue(ah_session.closed)
