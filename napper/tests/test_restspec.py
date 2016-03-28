@@ -51,3 +51,68 @@ class ConfigTests(Tests):
         spec = self.make_spec(
             permalink_attribute={"pattern": "^link_[0-9]+_url$"})
         self.assertEqual(spec.is_permalink_attr, self.make_matcher("^link_[0-9]+_url$"))
+
+
+class FetcherTests(Tests):
+    def f(self, obj):
+        obj = json.loads(json.dumps(obj), object_hook=restspec.WarnOnUnusedKeys)
+        return restspec.Fetcher.from_restspec(obj)
+
+    def nv(self):
+        return self.assertRaises(restspec.NoValue)
+
+    def test_missing_action(self):
+        with self.assertRaises(ValueError):
+            self.f({})
+
+    def test_value(self):
+        self.assertEqual(None, self.f({'value': None})({}))
+        self.assertEqual(0, self.f({'value': 0})({}))
+        self.assertEqual('ham', self.f({'value': 'ham'})({}))
+        self.assertEqual({'a': 0}, self.f({'value': {'a': 0}})({}))
+
+    def test_attribute(self):
+        f = self.f({'attr': 'spam'})
+        self.assertEqual('ham', f({'spam': 'ham', 'eggs': '42'}))
+        with self.nv():
+            f({'eggs': '42'})
+        with self.nv():
+            f('str doesnt have attrs')
+
+    def test_attribute_indirection(self):
+        f = self.f({'attr': {'attr': 'eggs'}})
+        self.assertEqual('spam', f({'eggs': 'ham', 'ham': 'spam'}))
+        with self.nv():
+            f({'ham': 'spam'})
+        with self.nv():
+            f({'eggs': 'ham'})
+
+    def test_deep_attribute(self):
+        f = self.f([{'attr': 'spam'}, {'attr': 'ham'}])
+        self.assertEqual('eggs', f({'spam': {'ham': 'eggs'}}))
+        with self.nv():
+            f('str doesnt have attrs')
+
+    def test_item(self):
+        fixt = ['spam', 'ham', 'eggs']
+        self.assertEqual('spam', self.f({'item': 0})(fixt))
+        self.assertEqual('ham', self.f({'item': 1})(fixt))
+        self.assertEqual('eggs', self.f({'item': 2})(fixt))
+        self.assertEqual('spam', self.f({'item': -3})(fixt))
+        self.assertEqual('ham', self.f({'item': -2})(fixt))
+        self.assertEqual('eggs', self.f({'item': -1})(fixt))
+        with self.nv():
+            self.f({'item': 3})(fixt)
+        with self.nv():
+            self.f({'item': -4})(fixt)
+
+    def test_format(self):
+        f = self.f({'format': ['John']})
+        self.assertEqual('Hello John!', f('Hello {}!'))
+        self.assertEqual('Goodbye John!', f('Goodbye {}!'))
+
+    def test_root(self):
+        f = self.f([{'attr': 'ham'}, None, {'attr': 'spam'}])
+        self.assertEqual('sausages', f({'ham': 'eggs', 'spam': 'sausages'}))
+        f = self.f(['Hello {}!', {'format': [[None, {'attr': 'name'}]]}])
+        self.assertEqual('Hello John!', f({'name': 'John'}))

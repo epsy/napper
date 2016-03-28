@@ -60,6 +60,7 @@ def always_false(*args, **kwargs):
     return False
 always_false.hint = no_value
 
+
 class Conditional:
     def __init__(self):
         self.checkers = []
@@ -164,22 +165,61 @@ class Fetcher:
         if not isinstance(obj, list):
             obj = [obj]
         for step in obj:
+            if step is None:
+                ret.steps.append(ret.step_root)
+                continue
+            elif not isinstance(step, abc.Mapping):
+                ret.steps.append(partial(ret.step_value, step))
+                continue
             with step:
-                attr = step['attr']
-                ret.steps.append(partial(ret.step_attr, attr))
+                if 'attr' in step:
+                    attr = step['attr']
+                    ret.steps.append(
+                        partial(ret.step_attr, Fetcher.from_restspec(attr)))
+                elif 'item' in step:
+                    i = step['item']
+                    ret.steps.append(
+                        partial(ret.step_item, Fetcher.from_restspec(i)))
+                elif 'format' in step:
+                    args = step['format']
+                    if not isinstance(args, list):
+                        args = []
+                    ret.steps.append(
+                        partial(ret.step_format,
+                                [Fetcher.from_restspec(arg) for arg in args]))
+                elif 'value' in step:
+                    value = step['value']
+                    try:
+                        value = value._value
+                    except AttributeError:
+                        pass
+                    ret.steps.append(partial(ret.step_value, value))
+                else:
+                    raise ValueError("Bad Fetcher description", step)
         return ret
 
-    def __call__(self, value):
-        ret = value
+    def __call__(self, value, root=None):
+        if root is None: root = value
         for step in self.steps:
-            ret = step(ret, value)
+            value = step(value, root)
+        return value
+
+    def step_value(self, ret, value, root):
         return ret
 
-    def step_attr(self, attr, value, root):
+    def step_root(self, value, root):
+        return root
+
+    def step_attr(self, get_attr_name, value, root):
         try:
-            return value[attr]
-        except KeyError:
+            return value[get_attr_name(value, root)]
+        except (KeyError, TypeError, IndexError):
             raise NoValue
+
+    step_item = step_attr
+
+    def step_format(self, args, value, root):
+        return value.format(*(arg(value, root) for arg in args))
 
 
 class RestSpec:
