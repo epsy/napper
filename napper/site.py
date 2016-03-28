@@ -13,11 +13,6 @@ from .request import Request, RequestBuilder
 from .errors import CrossOriginRequestError
 
 
-class NeverMatch(object):
-    def match(self, haystack):
-        return None
-
-
 class SessionFactory:
     def __init__(self, spec):
         self.spec = spec
@@ -43,12 +38,6 @@ class SessionFactory:
                 conn = aiohttp.ProxyConnector(proxy=proxy)
             session = aiohttp.ClientSession(connector=conn)
         return Session(self.spec, session)
-
-    def permalink_hint(self, key, obj):
-        return None
-
-    def permalink_obj(self, key):
-        return None
 
 
 _unset = object()

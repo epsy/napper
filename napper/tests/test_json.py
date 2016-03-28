@@ -2,26 +2,10 @@
 # Copyright (C) 2016 by Yann Kaiser and contributors.
 # See AUTHORS and COPYING for details.
 import re
+import json
 
 from .util import Tests
 from .. import request, response, util, restspec
-
-
-
-class StringAsyncReader:
-    def __init__(self, source):
-        self.source = source
-
-    async def text(self):
-        return self.source
-
-
-def consume(ito):
-    try:
-        while True:
-            next(ito)
-    except StopIteration as e:
-        return e.value
 
 
 class JsonResponseTests(Tests):
@@ -39,13 +23,11 @@ class JsonResponseTests(Tests):
 
     def setUp(self):
         super().setUp()
-        self.r = consume(
-            response.convert_json(
-                util.m(self.req), StringAsyncReader(self.json_object)))
+        self.r = self.make_response()
 
-    async def make_response(self):
-        return await response.convert_json(
-            util.m(self.req), StringAsyncReader(self.json_object))
+    def make_response(self):
+        return response.upgrade_object(
+            None, json.loads(self.json_object), None, util.m(self.req))
 
     def test_values_attr(self):
         self.assertEqual(self.r.num, 3)
@@ -91,7 +73,7 @@ class JsonResponseTests(Tests):
         r = re.compile('^.*_url$')
         m = self.sfactory.spec.is_permalink_attr = lambda key, *a: r.match(key)
         m.hint = restspec.no_value
-        resp = await self.make_response()
+        resp = self.make_response()
         for method in ['get', 'post', 'put', 'delete']:
             with self.subTest(method=method):
                 req = getattr(resp.snakes_url, method)()
@@ -104,7 +86,7 @@ class JsonResponseTests(Tests):
         r = re.compile('^.*_url$')
         m = self.sfactory.spec.is_permalink_attr = lambda key, *a: r.match(key)
         m.hint = lambda key, *a: key + '_url'
-        resp = await self.make_response()
+        resp = self.make_response()
         req = resp.snakes.get()
         self.assertIsInstance(req, request.Request)
         self.assertEqual(util.m(req).url, 'http://www.example.org/snakes')

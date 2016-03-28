@@ -1,7 +1,10 @@
 # napper -- A REST Client for Python
 # Copyright (C) 2016 by Yann Kaiser and contributors.
 # See AUTHORS and COPYING for details.
-from .response import convert_json
+import json
+import asyncio
+
+from .response import upgrade_object
 from .util import m, rag, METHODS, metafunc, getattribute_common
 
 
@@ -67,21 +70,22 @@ class Request(object):
         return MultiRequestBuilder(self, (('item', key),))
 
     @metafunc
+    @asyncio.coroutine
     def _read_result(self):
         r = yield from self.site._request(
             self.method, self.url, **self.kwargs)
         try:
-            return (yield from convert_json(self, r))
+            self._raw_data = json.loads((yield from r.text()))
         finally:
             r.close()
 
     @metafunc
     def __await__(self):
         try:
-            return self._data
+            self._raw_data
         except AttributeError:
-            self._data = ret = yield from self._read_result()
-            return ret
+            yield from self._read_result()
+        return upgrade_object(None, self._raw_data, None, self)
 
     __iter__ = __await__ # compatibility with yield from (i.e. in __await__)
 

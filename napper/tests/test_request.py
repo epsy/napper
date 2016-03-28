@@ -219,3 +219,18 @@ class RequestTests(Tests):
         self.assertIsInstance(req2, Request)
         self.assertAttrEqual(req2, 'url', "http://www.example.org/eggs")
         self.assertIs(util.rag(req2, 'site')._real_object, self.site)
+
+    async def test_paginated_list_after_link(self):
+        self.read_restspec(paginated_object={
+                "when": {"attr_exists": "list"},
+                "content": {"attr": "list"},
+                "next": {"attr": "after"}
+            })
+        req = self.site.path.get()
+        lis = []
+        with self.text_responses(
+                '{"list": [1, 2, 3], "after": "http://www.example.org/eggs"}',
+                '{"list": [4, 5, 6]}'):
+            async for item in req:
+                lis.append(item)
+        self.assertEqual(lis, [1, 2, 3, 4, 5, 6])

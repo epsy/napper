@@ -6,6 +6,7 @@ import json
 from collections import abc
 import warnings
 import re
+from functools import partial
 
 from .errors import UnknownParameters
 
@@ -62,6 +63,29 @@ always_false.hint = no_value
 class Conditional:
     def __init__(self):
         self.checkers = []
+
+    @classmethod
+    def from_restspec(cls, obj):
+        with obj:
+            ret = cls()
+            for cond, params in obj.items():
+                try:
+                    f = getattr(ret, 'cond_' + cond)
+                except AttributeError:
+                    raise ValueError("Unknown condition type: " + cond)
+                ret.checkers.append(partial(f, params))
+            return ret
+
+    def __call__(self, key, value, parent):
+        return all(cond(key, value, parent) for cond in self.checkers)
+
+    def cond_attr_exists(self, name, key, value, parent):
+        try:
+            value[name]
+        except (KeyError, TypeError):
+            return False
+        else:
+            return True
 
 
 class Matcher:
@@ -130,13 +154,42 @@ class Hint:
         return '<Hint []>'.format(self.fmt)
 
 
+class Fetcher:
+    def __init__(self):
+        self.steps = []
+
+    @classmethod
+    def from_restspec(cls, obj):
+        ret = cls()
+        if not isinstance(obj, list):
+            obj = [obj]
+        for step in obj:
+            with step:
+                attr = step['attr']
+                ret.steps.append(partial(ret.step_attr, attr))
+        return ret
+
+    def __call__(self, value):
+        ret = value
+        for step in self.steps:
+            ret = step(ret, value)
+        return ret
+
+    def step_attr(self, attr, value, root):
+        try:
+            return value[attr]
+        except KeyError:
+            raise NoValue
+
+
 class RestSpec:
     def __init__(self):
         self.address = None
         self.is_permalink_attr = always_false
-        self.is_paginator = always_false
+        self.is_paginator_object = always_false
         self.permalink_hint = no_value
         self.get_object_permalink = no_value
+        self.paginator_next_url = no_value
 
     @classmethod
     def from_file(cls, f):
@@ -152,13 +205,16 @@ class RestSpec:
             self.address = obj.get('base_address').rstrip('/')
             self.is_permalink_attr = \
                 Matcher.from_restspec(obj.get('permalink_attribute'))
-            self.permalink_hint = Hint.from_restspec( obj.get('permalink_object'))
+            self.permalink_hint = Hint.from_restspec(obj.get('permalink_object'))
+            self._read_paginator(obj.get('paginated_object'))
 
-    def parse_conditional(self, obj):
+    def _read_paginator(self, obj):
         if obj is None:
-            return always_false, no_value
-        #hintability = False
-        return always_false, no_value
+            return
+        with obj:
+            self.is_paginator_object = Conditional.from_restspec(obj['when'])
+            self.paginator_content = Fetcher.from_restspec(obj['content'])
+            self.paginator_next_url = Fetcher.from_restspec(obj['next'])
 
     def join_path(self, path):
         return self.address + '/' + '/'.join(path)

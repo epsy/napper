@@ -1,25 +1,19 @@
 # napper -- A REST Client for Python
 # Copyright (C) 2016 by Yann Kaiser and contributors.
 # See AUTHORS and COPYING for details.
-import asyncio
-import json
 import collections.abc
-from functools import partial
 
 from . import request, restspec
 from .util import requestmethods, rag, getattribute_dict, metafunc, METHODS
 
 
-@asyncio.coroutine
-def convert_json(request, response):
-    return upgrade_object(
-        json.loads((yield from response.text()),
-                   object_hook=partial(ResponseObject, request=request)),
-        request)
-
-
-def upgrade_object(val, request):
-    if isinstance(val, str):
+def upgrade_object(key, val, parent, request):
+    spec = request.site.spec
+    if spec.is_paginator_object(key, val, parent):
+        return PaginatorObject(val, request)
+    elif isinstance(val, dict):
+        return ResponseObject(val, request)
+    elif isinstance(val, str):
         return PermalinkString(val, request=request)
     elif isinstance(val, list):
         return ResponseList(val, request=request)
@@ -43,6 +37,66 @@ class ResponseList(collections.abc.Sequence):
 
     async def __aiter__(self):
         return ResponseListIterator(self)
+
+
+class PaginatorObject(collections.abc.Sequence):
+    def __init__(self, val, request):
+        self.request = request
+        self.spec = request.site.spec
+        self.paginator = val
+        self.pages = [val]
+        self.done = False
+        self.cache = list(self.spec.paginator_content(val))
+
+    def __repr__(self):
+        return '<PaginatorObject {0}{1}>'.format(
+            self.cache, '...' if not self.done else '')
+
+    def __getitem__(self, i):
+        return self.cache[i]
+
+    async def item(self, i):
+        while not self.done and len(self.cache) <= i:
+            await self._fetch_next_page()
+        if len(self.cache) > i:
+            return self.cache[i]
+        else:
+            raise IndexError(i)
+
+    async def _fetch_next_page(self):
+        try:
+            url = self.spec.paginator_next_url(self.pages[-1])
+        except restspec.NoValue:
+            self.done = True
+            return
+        req = request.Request(self.request.site, 'get', url)
+        await req
+        data = rag(req, '_raw_data')
+        self.pages.append(data)
+        self.cache.extend(self.spec.paginator_content(data))
+
+    def __len__(self, i):
+        return len(self.val)
+
+    async def __aiter__(self):
+        return PaginatorIterator(self)
+
+
+class PaginatorIterator:
+    def __init__(self, p):
+        self.p = p
+        self.index = 0
+
+    async def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            ret = await self.p.item(self.index)
+        except IndexError:
+            raise StopAsyncIteration
+        self.index += 1
+        return ret
 
 
 class ResponseListIterator:
@@ -118,9 +172,10 @@ class ResponseObject(collections.abc.Mapping):
     @metafunc
     def __getitem__(self, name):
         item = self.value[name]
+        spec = self.request.site.spec
         if isinstance(item, str):
-            if self.request.site.spec.is_permalink_attr(
+            if spec.is_permalink_attr(
                     name, item, self._real_object):
                 return PermalinkString(item, request=self.request)
             return item
-        return upgrade_object(item, self.request)
+        return upgrade_object(name, item, self, self.request)
