@@ -11,8 +11,7 @@ import warnings
 import io
 
 from ..util import rag
-from ..site import SessionFactory
-from ..request import Request
+from ..request import Request, SessionFactory
 
 
 class FakeTextResponse(object):

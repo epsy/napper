@@ -2,7 +2,8 @@
 # Copyright (C) 2016 by Yann Kaiser and contributors.
 # See AUTHORS and COPYING for details.
 from .util import run
-from .site import SessionFactory, RestSpecFinder
+from .request import SessionFactory
+from .importer import RestSpecFinder
 from .errors import CrossOriginRequestError
 
 

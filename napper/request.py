@@ -4,8 +4,82 @@
 import json
 import asyncio
 
+import aiohttp
+
+from .restspec import RestSpec
 from .response import upgrade_object
+from .errors import CrossOriginRequestError
 from .util import m, rag, METHODS, metafunc, getattribute_common
+
+
+class SessionFactory:
+    def __init__(self, spec):
+        self.spec = spec
+
+    @classmethod
+    def from_address(cls, address):
+        spec = RestSpec()
+        spec.address = address.rstrip('/')
+        return cls(spec)
+
+    def __repr__(self):
+        return "<SessionFactory [{}]>".format(self.address)
+
+    def __call__(self, session=None, proxy=None):
+        """
+        :param session: An `aiohttp.ClientSession` object
+        :param proxy: If session is unset, an http proxy addess. See
+            the documentation on `aiohttp.ProxyConnector`
+        """
+        if session is None:
+            conn = None
+            if proxy is not None:
+                conn = aiohttp.ProxyConnector(proxy=proxy)
+            session = aiohttp.ClientSession(connector=conn)
+        return Session(self.spec, session)
+
+
+_unset = object()
+
+
+class Session:
+    @property
+    def site(self):
+        return self
+
+    def __init__(self, spec, session, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.spec = spec
+        self.session = session
+
+    @metafunc
+    def __repr__(self):
+        return "<Site [{0.spec.address}]>".format(self)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        rag(self, 'session').close()
+
+    close = __exit__
+
+    @metafunc
+    def __getitem__(self, name):
+        return RequestBuilder(self, (name,))
+
+    __getattribute__ = getattribute_common(__getitem__)
+
+    @metafunc
+    def build_request(self, method, path, **kwargs):
+        jpath = self.spec.join_path(path)
+        return Request(self, method, jpath, **kwargs)
+
+    @metafunc
+    def _request(self, method, url, *args, **kwargs):
+        if not self.spec.is_same_origin(url):
+            raise CrossOriginRequestError(self, method, url, (), {})
+        return self.session.request(method, url, *args, **kwargs)
 
 
 class RequestBuilder(object):
