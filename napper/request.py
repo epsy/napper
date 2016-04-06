@@ -159,7 +159,7 @@ class Request(object):
             self._raw_data
         except AttributeError:
             yield from self._read_result()
-        return upgrade_object(None, self._raw_data, None, self)
+        return upgrade_object(self._raw_data, self)
 
     __iter__ = __await__ # compatibility with yield from (i.e. in __await__)
 

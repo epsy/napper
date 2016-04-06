@@ -27,7 +27,7 @@ class JsonResponseTests(Tests):
 
     def make_response(self):
         return response.upgrade_object(
-            None, json.loads(self.json_object), None, util.m(self.req))
+            json.loads(self.json_object), util.m(self.req))
 
     def test_values_attr(self):
         self.assertEqual(self.r.num, 3)

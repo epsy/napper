@@ -7,9 +7,12 @@ from . import request, restspec
 from .util import requestmethods, rag, getattribute_dict, metafunc, METHODS
 
 
-def upgrade_object(key, val, parent, request):
+def upgrade_object(val, request, context=None):
     spec = request.site.spec
-    if spec.is_paginator_object(val, context={'parent': parent, 'attribute': key}):
+    if context is None:
+        context = {}
+    context.setdefault('root', val)
+    if spec.is_paginator_object(val, context):
         return PaginatorObject(val, request)
     elif isinstance(val, dict):
         return ResponseObject(val, request)
@@ -178,4 +181,5 @@ class ResponseObject(collections.abc.Mapping):
                     name, item, self._real_object):
                 return PermalinkString(item, request=self.request)
             return item
-        return upgrade_object(name, item, self, self.request)
+        return upgrade_object(item, self.request,
+                              {'parent': 'self', 'attribute': name})
