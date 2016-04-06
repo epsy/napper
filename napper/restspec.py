@@ -202,7 +202,7 @@ class Fetcher:
                     try:
                         func = getattr(ret, 'step_' + key)
                     except AttributeError:
-                        pass
+                        raise ValueError("Unknown step: " + key)
                     else:
                         par = partial(func,
                                       Conversion.convert_arg(func, step[key]))
