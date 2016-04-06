@@ -6,7 +6,8 @@ import json
 from collections import abc
 import warnings
 import re
-from functools import partial
+from functools import partial, wraps
+import enum
 
 from .errors import UnknownParameters
 
@@ -15,13 +16,16 @@ class WarnOnUnusedKeys(abc.Mapping):
     def __init__(self, value):
         self._value = value
 
+    def __repr__(self):
+        return repr(self._value)
+
     def __len__(self):
         return len(self._value)
 
     def __getitem__(self, key):
         try:
-            self._unused_keys.remove(key)
-        except KeyError:
+            self._unused_keys.discard(key)
+        except AttributeError:
             pass
         return self._value[key]
 
@@ -59,34 +63,6 @@ def no_value(*args, **kwargs):
 def always_false(*args, **kwargs):
     return False
 always_false.hint = no_value
-
-
-class Conditional:
-    def __init__(self):
-        self.checkers = []
-
-    @classmethod
-    def from_restspec(cls, obj):
-        with obj:
-            ret = cls()
-            for cond, params in obj.items():
-                try:
-                    f = getattr(ret, 'cond_' + cond)
-                except AttributeError:
-                    raise ValueError("Unknown condition type: " + cond)
-                ret.checkers.append(partial(f, params))
-            return ret
-
-    def __call__(self, key, value, parent):
-        return all(cond(key, value, parent) for cond in self.checkers)
-
-    def cond_attr_exists(self, name, key, value, parent):
-        try:
-            value[name]
-        except (KeyError, TypeError):
-            return False
-        else:
-            return True
 
 
 class Matcher:
@@ -155,6 +131,57 @@ class Hint:
         return '<Hint []>'.format(self.fmt)
 
 
+@enum.unique
+class Conversion(enum.Enum):
+    RAW = 0
+    WHOLE = 1
+    EACH = 2
+    WHOLE_CONDITIONAL = 3
+    EACH_CONDITIONAL = 4
+
+    @classmethod
+    def convert_arg(cls, func, arg):
+        conv = getattr(func, 'convert_arg', cls.WHOLE)
+        if conv == cls.RAW:
+            try:
+                return arg._value
+            except AttributeError:
+                return arg
+        elif conv == cls.WHOLE:
+            return Fetcher.from_restspec(arg)
+        elif conv == cls.EACH:
+            return [Fetcher.from_restspec(a) for a in arg]
+        elif conv == cls.WHOLE_CONDITIONAL:
+            return Conditional.from_restspec(arg)
+        elif conv == cls.EACH_CONDITIONAL:
+            return [Conditional.from_restspec(a) for a in arg]
+        raise AssertionError("Bad conversion type", conv)
+
+
+def attr_setter(attr, base_type):
+    def func(value):
+        assert isinstance(value, base_type)
+        def deco(func):
+            setattr(func, attr, value)
+            return func
+        return deco
+    return func
+
+
+convert_arg = attr_setter('convert_arg', Conversion)
+
+
+def boolean_result(func):
+    @wraps(func)
+    def _ret(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except NoValue:
+            return False
+    _ret.boolean_result = True
+    return _ret
+
+
 class Fetcher:
     def __init__(self):
         self.steps = []
@@ -165,61 +192,133 @@ class Fetcher:
         if not isinstance(obj, list):
             obj = [obj]
         for step in obj:
-            if step is None:
-                ret.steps.append(ret.step_root)
-                continue
-            elif not isinstance(step, abc.Mapping):
+            if not isinstance(step, abc.Mapping):
                 ret.steps.append(partial(ret.step_value, step))
                 continue
             with step:
-                if 'attr' in step:
-                    attr = step['attr']
-                    ret.steps.append(
-                        partial(ret.step_attr, Fetcher.from_restspec(attr)))
-                elif 'item' in step:
-                    i = step['item']
-                    ret.steps.append(
-                        partial(ret.step_item, Fetcher.from_restspec(i)))
-                elif 'format' in step:
-                    args = step['format']
-                    if not isinstance(args, list):
-                        args = []
-                    ret.steps.append(
-                        partial(ret.step_format,
-                                [Fetcher.from_restspec(arg) for arg in args]))
-                elif 'value' in step:
-                    value = step['value']
+                conds = []
+                has_noncond = False
+                for key in step:
                     try:
-                        value = value._value
+                        func = getattr(ret, 'step_' + key)
                     except AttributeError:
                         pass
-                    ret.steps.append(partial(ret.step_value, value))
-                else:
-                    raise ValueError("Bad Fetcher description", step)
+                    else:
+                        par = partial(func,
+                                      Conversion.convert_arg(func, step[key]))
+                        if getattr(func, 'boolean_result', False):
+                            conds.append(par)
+                        else:
+                            if has_noncond:
+                                raise ValueError(
+                                    "Fetcher step description has multiple "
+                                    "fetchers")
+                            has_noncond = True
+                            ret.steps.append(par)
+                        if has_noncond and conds:
+                            raise ValueError(
+                                "Fetcher step description mixes conditionals "
+                                "and fetchers")
+                if len(conds) == 1:
+                    ret.steps.append(conds[0])
+                elif conds:
+                    ret.steps.append(partial(ret.step_all, conds))
+                elif not has_noncond:
+                    raise ValueError("Fetcher step description is empty")
         return ret
 
-    def __call__(self, value, root=None):
-        if root is None: root = value
+    def __repr__(self):
+        return '<{} {}>'.format(self.__class__.__name__, self.steps)
+
+    def __call__(self, value, context=None):
+        if context is None: context = {'root': value, 'value': value}
+        context = context.copy()
         for step in self.steps:
-            value = step(value, root)
+            value = step(value, context)
+            context['value'] = value
         return value
 
-    def step_value(self, ret, value, root):
+    @boolean_result
+    def always(self, ret, value, context):
         return ret
 
-    def step_root(self, value, root):
-        return root
+    @convert_arg(Conversion.RAW)
+    def step_value(self, ret, value, context):
+        return ret
 
-    def step_attr(self, get_attr_name, value, root):
+    def step_attr(self, get_attr_name, value, context):
         try:
-            return value[get_attr_name(value, root)]
+            return value[get_attr_name(value, context)]
         except (KeyError, TypeError, IndexError):
             raise NoValue
 
     step_item = step_attr
 
-    def step_format(self, args, value, root):
-        return value.format(*(arg(value, root) for arg in args))
+    @convert_arg(Conversion.EACH)
+    def step_format(self, args, value, context):
+        return value.format(*(arg(value, context) for arg in args))
+
+    def step_context(self, context_key, value, context):
+        key = context_key(value, context)
+        try:
+            return context[key]
+        except KeyError:
+            raise NoValue
+
+    @boolean_result
+    def step_attr_exists(self, name, value, context):
+        try:
+            value[name(value, context)]
+        except (KeyError, TypeError):
+            return False
+        else:
+            return True
+
+    @boolean_result
+    @convert_arg(Conversion.EACH)
+    def step_eq(self, args, value, context):
+        assert len(args) >= 2
+        values = (arg(value, context) for arg in args)
+        first = next(values)
+        for val in values:
+            if val != first:
+                return False
+        return True
+
+    @boolean_result
+    def step_is_eq(self, arg, value, context):
+        return arg(value, context) == value
+
+    @boolean_result
+    @convert_arg(Conversion.WHOLE_CONDITIONAL)
+    def step_not(self, arg, value, context):
+        return not arg(value, context)
+
+    @boolean_result
+    @convert_arg(Conversion.EACH_CONDITIONAL)
+    def step_all(self, args, value, context):
+        return all(arg(value, context) for arg in args)
+
+    @boolean_result
+    @convert_arg(Conversion.EACH_CONDITIONAL)
+    def step_any(self, args, value, context):
+        return any(arg(value, context) for arg in args)
+
+
+class Conditional(Fetcher):
+    @classmethod
+    def from_restspec(cls, obj):
+        if obj in ["always", "never"]:
+            ret = cls()
+            ret.steps.append(partial(ret.always, obj == "always"))
+            return ret
+        ret = super().from_restspec(obj)
+        last_step = ret.steps[-1]
+        last_func = last_step.func
+        if not getattr(last_func, 'boolean_result', False):
+            if last_func != ret.step_value or last_step.args[0] not in [True, False]:
+                raise ValueError("Conditional required, got: ", last_func)
+        return ret
 
 
 class RestSpec:
@@ -252,7 +351,7 @@ class RestSpec:
         if obj is None:
             return
         with obj:
-            self.is_paginator_object = Conditional.from_restspec(obj['when'])
+            self.is_paginator_object = Fetcher.from_restspec(obj['when'])
             self.paginator_content = Fetcher.from_restspec(obj['content'])
             self.paginator_next_url = Fetcher.from_restspec(obj['next'])
 

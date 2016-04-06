@@ -9,7 +9,7 @@ from .util import requestmethods, rag, getattribute_dict, metafunc, METHODS
 
 def upgrade_object(key, val, parent, request):
     spec = request.site.spec
-    if spec.is_paginator_object(key, val, parent):
+    if spec.is_paginator_object(val, context={'parent': parent, 'attribute': key}):
         return PaginatorObject(val, request)
     elif isinstance(val, dict):
         return ResponseObject(val, request)
