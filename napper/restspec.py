@@ -60,11 +60,6 @@ def no_value(*args, **kwargs):
     raise NoValue
 
 
-def always_false(*args, **kwargs):
-    return False
-always_false.hint = no_value
-
-
 class Matcher:
     def __init__(self):
         self.pattern = None
@@ -95,15 +90,15 @@ class Matcher:
                     '^{}.*{}$'.format(re.escape(prefix), re.escape(suffix)))
         return ret
 
-    def __call__(self, key, value, parent):
+    def __call__(self, value, context):
         if self.pattern is None:
             return False
-        return bool(self.pattern.match(key))
+        return bool(self.pattern.match(value))
 
-    def hint(self, key, parent):
+    def hint(self, key):
         if self.hint_fmt is None:
             raise NoValue
-        return self.hint_fmt.format(key, parent)
+        return self.hint_fmt.format(key)
 
     def __repr__(self):
         return '<Matcher [{}]>'.format(self.pattern.pattern)
@@ -138,6 +133,7 @@ class Conversion(enum.Enum):
     EACH = 2
     WHOLE_CONDITIONAL = 3
     EACH_CONDITIONAL = 4
+    MATCHER = 5
 
     @classmethod
     def convert_arg(cls, func, arg):
@@ -155,6 +151,8 @@ class Conversion(enum.Enum):
             return Conditional.from_restspec(arg)
         elif conv == cls.EACH_CONDITIONAL:
             return [Conditional.from_restspec(a) for a in arg]
+        elif conv == cls.MATCHER:
+            return Matcher.from_restspec(arg)
         raise AssertionError("Bad conversion type", conv)
 
 
@@ -188,6 +186,8 @@ class Fetcher:
 
     @classmethod
     def from_restspec(cls, obj):
+        if obj is None:
+            return no_value
         ret = cls()
         if not isinstance(obj, list):
             obj = [obj]
@@ -247,8 +247,9 @@ class Fetcher:
         return ret
 
     def step_attr(self, get_attr_name, value, context):
+        name = get_attr_name(value, context)
         try:
-            return value[get_attr_name(value, context)]
+            return value[name]
         except (KeyError, TypeError, IndexError):
             raise NoValue
 
@@ -290,6 +291,11 @@ class Fetcher:
         return arg(value, context) == value
 
     @boolean_result
+    @convert_arg(Conversion.MATCHER)
+    def step_matches(self, arg, value, context):
+        return arg(value, context)
+
+    @boolean_result
     @convert_arg(Conversion.WHOLE_CONDITIONAL)
     def step_not(self, arg, value, context):
         return not arg(value, context)
@@ -308,7 +314,7 @@ class Fetcher:
 class Conditional(Fetcher):
     @classmethod
     def from_restspec(cls, obj):
-        if obj in ["always", "never"]:
+        if obj in ["always", "never", None]:
             ret = cls()
             ret.steps.append(partial(ret.always, obj == "always"))
             return ret
@@ -319,6 +325,22 @@ class Conditional(Fetcher):
             if last_func != ret.step_value or last_step.args[0] not in [True, False]:
                 raise ValueError("Conditional required, got: ", last_func)
         return ret
+
+    def attr_name_hint(self, name):
+        if len(self.steps) == 2:
+            s0 = self.steps[0]
+            s1 = self.steps[1]
+            if s0.func == self.step_context:
+                f1 = s0.args[0]
+                if len(f1.steps) == 1:
+                    v1 = f1.steps[0]
+                    if v1.func == f1.step_value and v1.args == ('attribute',):
+                        if s1.func == self.step_matches:
+                            return s1.args[0].hint(name)
+        raise NoValue
+
+
+always_false = Conditional.from_restspec("never")
 
 
 class RestSpec:
@@ -343,8 +365,10 @@ class RestSpec:
         with obj:
             self.address = obj.get('base_address').rstrip('/')
             self.is_permalink_attr = \
-                Matcher.from_restspec(obj.get('permalink_attribute'))
-            self.permalink_hint = Hint.from_restspec(obj.get('permalink_object'))
+                Conditional.from_restspec(obj.get('permalink_attribute'))
+            self.get_object_permalink = \
+                Fetcher.from_restspec(obj.get('permalink_object'))
+            #self.permalink_hint = Hint.from_restspec(obj.get('permalink_object'))
             self._read_paginator(obj.get('paginated_object'))
 
     def _read_paginator(self, obj):

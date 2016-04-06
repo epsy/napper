@@ -12,6 +12,7 @@ import io
 
 from ..util import rag
 from ..request import Request, SessionFactory
+from .. import restspec
 
 
 class FakeTextResponse(object):
@@ -87,6 +88,10 @@ class Tests(unittest.TestCase, metaclass=TestsMeta):
     def read_restspec(self, **spec):
         spec.setdefault('base_address', 'http://www.example.org')
         self.sfactory.spec._read_spec_file(io.StringIO(json.dumps(spec)))
+
+    def to_config_dict(self, obj):
+        return json.loads(json.dumps(obj),
+                          object_hook=restspec.WarnOnUnusedKeys)
 
     def text_response(self, text, status=200, *, req=None):
         return self.text_responses(text, final_status=status, req=req)

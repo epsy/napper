@@ -151,10 +151,9 @@ class ResponseObject(collections.abc.Mapping):
     def __getattribute__(self, name):
         site = self.request.site
         if name in METHODS or name == 'request':
-            plink_name = site.spec.permalink_hint(self._real_object)
             try:
-                addr = self._real_object[plink_name]
-            except KeyError:
+                addr = site.spec.get_object_permalink(self._real_object)
+            except restspec.NoValue:
                 pass
             else:
                 return getattr(PermalinkString(addr, request=self.request),
@@ -163,8 +162,7 @@ class ResponseObject(collections.abc.Mapping):
             return self._real_object[name]
         except KeyError:
             try:
-                name_hint = site.spec.is_permalink_attr.hint(
-                    name, self._real_object)
+                name_hint = site.spec.is_permalink_attr.attr_name_hint(name)
             except restspec.NoValue:
                 raise AttributeError(name) from None
             try:
@@ -178,7 +176,7 @@ class ResponseObject(collections.abc.Mapping):
         spec = self.request.site.spec
         if isinstance(item, str):
             if spec.is_permalink_attr(
-                    name, item, self._real_object):
+                    item, {'attribute': name, 'parent': self._real_object}):
                 return PermalinkString(item, request=self.request)
             return item
         return upgrade_object(item, self.request,

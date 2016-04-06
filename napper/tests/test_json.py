@@ -1,7 +1,6 @@
 # napper -- A REST Client for Python
 # Copyright (C) 2016 by Yann Kaiser and contributors.
 # See AUTHORS and COPYING for details.
-import re
 import json
 
 from .util import Tests
@@ -69,10 +68,13 @@ class JsonResponseTests(Tests):
         with self.assertRaises(AttributeError):
             self.r.snakes_url.get()
 
+    def attr_matcher(self, **match):
+        return restspec.Conditional.from_restspec(self.to_config_dict(
+            [{'context': 'attribute'}, {'matches': match}]))
+
     async def test_permalink(self):
-        r = re.compile('^.*_url$')
-        m = self.sfactory.spec.is_permalink_attr = lambda key, *a: r.match(key)
-        m.hint = restspec.no_value
+        self.sfactory.spec.is_permalink_attr = \
+            self.attr_matcher(pattern='^.*_url$')
         resp = self.make_response()
         for method in ['get', 'post', 'put', 'delete']:
             with self.subTest(method=method):
@@ -83,9 +85,8 @@ class JsonResponseTests(Tests):
                 self.assertEqual(util.m(req).method, method.upper())
 
     async def test_permalink_hint(self):
-        r = re.compile('^.*_url$')
-        m = self.sfactory.spec.is_permalink_attr = lambda key, *a: r.match(key)
-        m.hint = lambda key, *a: key + '_url'
+        self.sfactory.spec.is_permalink_attr = \
+            self.attr_matcher(suffix='_url')
         resp = self.make_response()
         req = resp.snakes.get()
         self.assertIsInstance(req, request.Request)

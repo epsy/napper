@@ -4,7 +4,6 @@
 
 import io
 import json
-import re
 
 from .. import restspec
 from ..errors import UnknownParameters
@@ -29,28 +28,47 @@ class ConfigTests(Tests):
         spec = self.make_spec(base_address="http://an.address.com/")
         self.assertEqual(spec.address, "http://an.address.com")
 
-    def make_matcher(self, pattern):
-        m = restspec.Matcher()
-        m.pattern = re.compile(pattern)
-        return m
-
     def test_permalink_attr_suffix(self):
-        spec = self.make_spec(permalink_attribute={"suffix": "_url"})
-        self.assertEqual(spec.is_permalink_attr, self.make_matcher("^.*_url$"))
+        spec = self.make_spec(permalink_attribute=[
+            {"context": "attribute"}, {"matches": {"suffix": "_url"}}])
+        self.assertTrue(
+            spec.is_permalink_attr("https://...", {"attribute": "abcd_url"}))
+        self.assertFalse(
+            spec.is_permalink_attr("https://...", {"attribute": "abcd"}))
 
     def test_permalink_attr_prefix(self):
-        spec = self.make_spec(permalink_attribute={"prefix": "link_"})
-        self.assertEqual(spec.is_permalink_attr, self.make_matcher("^link_.*$"))
+        spec = self.make_spec(permalink_attribute=[
+            {"context": "attribute"}, {"matches": {"prefix": "link_"}}])
+        self.assertTrue(
+            spec.is_permalink_attr("https://...", {"attribute": "link_abcd"}))
+        self.assertFalse(
+            spec.is_permalink_attr("https://...", {"attribute": "abcd"}))
 
     def test_permalink_attr_prefix_suffix(self):
-        spec = self.make_spec(
-            permalink_attribute={"prefix": "link_", "suffix": "_url"})
-        self.assertEqual(spec.is_permalink_attr, self.make_matcher("^link_.*_url$"))
+        spec = self.make_spec(permalink_attribute=[
+            {"context": "attribute"}, {"matches": {"prefix": "link_",
+                                                   "suffix": "_url"}}])
+        self.assertTrue(spec.is_permalink_attr(
+            "https://...", {"attribute": "link_abcd_url"}))
+        self.assertFalse(spec.is_permalink_attr(
+            "https://...", {"attribute": "link_abcd"}))
+        self.assertFalse(spec.is_permalink_attr(
+            "https://...", {"attribute": "abcd_url"}))
+        self.assertFalse(spec.is_permalink_attr(
+            "https://...", {"attribute": "abcd"}))
 
     def test_permalink_attr_pattern(self):
-        spec = self.make_spec(
-            permalink_attribute={"pattern": "^link_[0-9]+_url$"})
-        self.assertEqual(spec.is_permalink_attr, self.make_matcher("^link_[0-9]+_url$"))
+        spec = self.make_spec(permalink_attribute=[
+            {"context": "attribute"},
+            {"matches": {"pattern": "^link_[0-9]+_url$"}}])
+        self.assertTrue(spec.is_permalink_attr(
+            "https://...", {"attribute": "link_4_url"}))
+        self.assertTrue(spec.is_permalink_attr(
+            "https://...", {"attribute": "link_123456_url"}))
+        self.assertFalse(spec.is_permalink_attr(
+            "https://...", {"attribute": "link_abcd_url"}))
+        self.assertFalse(spec.is_permalink_attr(
+            "https://...", {"attribute": "1234567"}))
 
 
 class FetcherTests(Tests):
@@ -61,6 +79,18 @@ class FetcherTests(Tests):
     def nv(self):
         return self.assertRaises(restspec.NoValue)
 
+    def test_none(self):
+        f = self.f(None)
+        with self.nv():
+            f({})
+        with self.nv():
+            f("abc")
+        with self.nv():
+            f({"spam": "ham"})
+        r = {"spam": "ham"}
+        with self.nv():
+            f("ham", {"parent": r, "key": "spam", "root": r})
+
     def test_missing_action(self):
         with self.assertRaises(ValueError):
             self.f({})
@@ -70,7 +100,7 @@ class FetcherTests(Tests):
             self.f({'attr': 'abc', 'value': 42})
 
     def test_implicit_value(self):
-        self.assertEqual(None, self.f(None)({}))
+        self.assertEqual(None, self.f([None])({}))
         self.assertEqual(0, self.f(0)({}))
         self.assertEqual(42, self.f(42)({}))
         self.assertEqual('ham', self.f('ham')({}))
@@ -142,6 +172,14 @@ class ConditionalTests(Tests):
 
     def test_always_false(self):
         c = self.c("never")
+        self.assertFalse(c({}))
+        self.assertFalse(c("abc"))
+        self.assertFalse(c({"spam": "ham"}))
+        r = {"spam": "ham"}
+        self.assertFalse(c("ham", {"parent": r, "key": "spam", "root": r}))
+
+    def test_none(self):
+        c = self.c(None)
         self.assertFalse(c({}))
         self.assertFalse(c("abc"))
         self.assertFalse(c({"spam": "ham"}))
@@ -235,3 +273,20 @@ class ConditionalTests(Tests):
     def test_mixed(self):
         with self.assertRaises(ValueError):
             self.c({'attr_exists': 'abc', 'value': 'True'})
+
+    def test_match(self):
+        c = self.c({'matches': {'prefix': 'link_', 'suffix': '_url'}})
+        self.assertTrue(c('link_stuff_url'))
+        self.assertFalse(c('link_stuff'))
+        self.assertFalse(c('stuff_url'))
+        self.assertFalse(c('link_url'))
+        c = self.c({'matches': {'pattern': 'link_.*_url'}})
+        self.assertTrue(c('link_stuff_url'))
+        self.assertFalse(c('link_stuff'))
+        self.assertFalse(c('stuff_url'))
+        self.assertFalse(c('link_url'))
+
+    def test_hint(self):
+        c = self.c([{'context': 'attribute'}, {'matches': {'suffix': '_url'}}])
+        self.assertEqual(c.attr_name_hint('abc'), 'abc_url')
+        self.assertEqual(c.attr_name_hint('xyz'), 'xyz_url')

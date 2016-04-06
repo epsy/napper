@@ -1,8 +1,6 @@
 # napper -- A REST Client for Python
 # Copyright (C) 2016 by Yann Kaiser and contributors.
 # See AUTHORS and COPYING for details.
-import re
-
 from .util import Tests
 from .. import CrossOriginRequestError
 from ..request import Request, SessionFactory
@@ -81,8 +79,9 @@ class RequestBuilderTests(Tests):
 class RequestTests(Tests):
     def setUp(self):
         super().setUp()
-        self.matcher = m = restspec.Matcher()
-        m.pattern = re.compile('^thing$')
+        self.matcher = restspec.Conditional.from_restspec(self.to_config_dict(
+            [{'context': 'attribute'}, {'matches': {'pattern': '^thing$'}}]
+            ))
 
     async def test_values(self):
         resp = await self.request('{"a": 42, "ham": ["eggs", "spam"]}')
@@ -197,7 +196,8 @@ class RequestTests(Tests):
                 params={'param': "val"}, data={'spam': 'ham', 'eggs': 42})
 
     async def test_permalink_attr(self):
-        self.read_restspec(permalink_attribute={'suffix': '_url'})
+        self.read_restspec(permalink_attribute=[
+            {'context': 'attribute'}, {'matches': {'suffix': '_url'}}])
         req = self.site.path.get()
         with self.text_response('{"eggs_url": "http://www.example.org/eggs"}'):
             resp = await req
@@ -211,7 +211,7 @@ class RequestTests(Tests):
         self.assertIs(util.rag(req2, 'site')._real_object, self.site)
 
     async def test_permalink_object(self):
-        self.read_restspec(permalink_object='permalink')
+        self.read_restspec(permalink_object={'attr': 'permalink'})
         req = self.site.path.get()
         with self.text_response('{"permalink": "http://www.example.org/eggs"}'):
             resp = await req
