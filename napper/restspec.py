@@ -136,8 +136,7 @@ class Conversion(enum.Enum):
     MATCHER = 5
 
     @classmethod
-    def convert_arg(cls, func, arg):
-        conv = getattr(func, 'convert_arg', cls.WHOLE)
+    def convert(cls, conv, arg):
         if conv == cls.RAW:
             try:
                 return arg._value
@@ -155,6 +154,10 @@ class Conversion(enum.Enum):
             return Matcher.from_restspec(arg)
         raise AssertionError("Bad conversion type", conv)
 
+    @classmethod
+    def convert_for_func(cls, func, arg):
+        return cls.convert(getattr(func, 'convert_arg', cls.WHOLE), arg)
+
 
 def attr_setter(attr, base_type):
     def func(value):
@@ -167,6 +170,7 @@ def attr_setter(attr, base_type):
 
 
 convert_arg = attr_setter('convert_arg', Conversion)
+takes_keywords = attr_setter('takes_keywords', dict)
 
 
 def boolean_result(func):
@@ -198,14 +202,22 @@ class Fetcher:
             with step:
                 conds = []
                 has_noncond = False
+                errors = []
                 for key in step:
                     try:
                         func = getattr(ret, 'step_' + key)
                     except AttributeError:
-                        raise ValueError("Unknown step: " + key)
+                        errors.append(key)
                     else:
-                        par = partial(func,
-                                      Conversion.convert_arg(func, step[key]))
+                        kwds = getattr(func, 'takes_keywords', {})
+                        kwargs = {}
+                        for kname, conv in kwds.items():
+                            kwargs[kname] = Conversion.convert(
+                                conv, step[kname.rstrip('_')])
+                        par = partial(
+                            func,
+                            Conversion.convert_for_func(func, step[key]),
+                            **kwargs)
                         if getattr(func, 'boolean_result', False):
                             conds.append(par)
                         else:
@@ -309,6 +321,14 @@ class Fetcher:
     @convert_arg(Conversion.EACH_CONDITIONAL)
     def step_any(self, args, value, context):
         return any(arg(value, context) for arg in args)
+
+    @convert_arg(Conversion.WHOLE_CONDITIONAL)
+    @takes_keywords({'then_': Conversion.WHOLE, 'else_': Conversion.WHOLE})
+    def step_if(self, cond, value, context, *, then_, else_):
+        if cond(value, context):
+            return then_(value, context)
+        else:
+            return else_(value, context)
 
 
 class Conditional(Fetcher):

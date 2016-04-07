@@ -160,6 +160,11 @@ class FetcherTests(Tests):
         f = self.f(['Hello {}!', {'format': [[{'context': 'root'}, {'attr': 'name'}]]}])
         self.assertEqual('Hello John!', f({'name': 'John'}))
 
+    def test_ifelse(self):
+        f = self.f({'if': {'is_eq': 23}, 'then': 'abc', 'else': 'def'})
+        self.assertEqual(f(23), 'abc')
+        self.assertEqual(f(24), 'def')
+
 
 class ConditionalTests(Tests):
     def c(self, obj):
