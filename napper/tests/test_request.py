@@ -5,7 +5,7 @@ from .util import Tests
 from .. import CrossOriginRequestError
 from ..request import Request, SessionFactory
 from ..response import PermalinkString
-from .. import util, restspec
+from .. import util, restspec, errors
 
 
 class RequestBuilderTests(Tests):
@@ -234,6 +234,38 @@ class RequestTests(Tests):
             async for item in req:
                 lis.append(item)
         self.assertEqual(lis, [1, 2, 3, 4, 5, 6])
+
+    async def test_raise_http404(self):
+        with self.text_response('{"docs": "someplace"}', status=404):
+            with self.assertRaises(errors.http.NotFound) as r:
+                await self.req
+            self.assertEqual(r.exception.docs, 'someplace')
+            self.assertEqual(r.exception['docs'], 'someplace')
+
+    async def test_404_expected(self):
+        with self.text_response('{"docs": "someplace"}', status=404):
+            self.req.expected = errors.http.NotFound
+            resp = await self.req
+            self.assertEqual(resp['docs'], 'someplace')
+            self.assertEqual(resp.docs, 'someplace')
+
+    async def test_raise_unknown_status(self):
+        with self.text_response('{"status": "all teapots unavailable"}', 518):
+            with self.assertRaises(errors.http.ServerError) as r:
+                await self.req
+            self.assertEqual(r.exception.status_code, 518)
+            self.assertEqual(r.exception.status, "all teapots unavailable")
+
+    async def test_raise_unknown_status_class(self):
+        with self.text_response('{"status": "your service will be assimilated"}', 600):
+            with self.assertRaises(errors.http.Any) as r:
+                await self.req
+            self.assertEqual(r.exception.status_code, 600)
+            self.assertEqual(r.exception.status, "your service will be assimilated")
+
+    async def test_inst_http(self):
+        with self.assertRaises(TypeError):
+            errors.http()
 
 
 class SiteTests(Tests):

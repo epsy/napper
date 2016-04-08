@@ -8,7 +8,7 @@ import aiohttp
 
 from .restspec import RestSpec
 from .response import upgrade_object
-from .errors import CrossOriginRequestError
+from .errors import CrossOriginRequestError, http
 from .util import m, rag, METHODS, metafunc, getattribute_common
 
 
@@ -146,12 +146,14 @@ class Request(object):
     @metafunc
     @asyncio.coroutine
     def _read_result(self):
-        r = yield from self.site._request(
+        self._response = r = yield from self.site._request(
             self.method, self.url, **self.kwargs)
         try:
             self._raw_data = json.loads((yield from r.text()))
         finally:
             r.close()
+
+    expected = http.Success
 
     @metafunc
     def __await__(self):
@@ -159,7 +161,11 @@ class Request(object):
             self._raw_data
         except AttributeError:
             yield from self._read_result()
-        return upgrade_object(self._raw_data, self)
+        cls = http.cls_for_code(self._response.status)
+        if issubclass(cls, self.expected):
+            return upgrade_object(self._raw_data, self)
+        else:
+            raise cls(self, upgrade_object(self._raw_data, self))
 
     __iter__ = __await__ # compatibility with yield from (i.e. in __await__)
 

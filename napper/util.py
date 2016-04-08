@@ -28,6 +28,7 @@ def getattribute_attrs(*attrs):
 
 
 getattribute_dict = getattribute_attrs('keys', 'values', 'items')
+getattribute_exc = getattribute_attrs('with_traceback', 'status_code')
 
 
 def rag(self, name):
