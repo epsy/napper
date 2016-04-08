@@ -83,6 +83,82 @@ class RequestTests(Tests):
             [{'context': 'attribute'}, {'matches': {'pattern': '^thing$'}}]
             ))
 
+
+class FollowTests(RequestTests):
+    async def test_follow_request(self):
+        util.rag(self.site, 'spec').is_permalink_attr = self.matcher
+        with self.text_responses(
+                '{"thing": "http://www.example.org/other_res"}', '"spam"'):
+            self.assertEqual((await self.req.thing.get()), 'spam')
+
+    async def test_follow_request_attr(self):
+        util.rag(self.site, 'spec').is_permalink_attr = self.matcher
+        with self.text_responses(
+                '{"thing": "http://www.example.org/other_res"}',
+                '{"ham": "spam"}'):
+            self.assertEqual((await self.req.thing.get().ham), 'spam')
+
+    async def test_follow_xsite(self):
+        util.rag(self.site, 'spec').is_permalink_attr = self.matcher
+        with self.text_response('{"thing": "http://www.example.com/"}'):
+            nextreq = await self.req.thing
+        with self.assertRaises(CrossOriginRequestError):
+            with self.text_response('"I am the danger"'):
+                await nextreq.get()
+
+    async def test_permalink_attr(self):
+        self.read_restspec(permalink_attribute=[
+            {'context': 'attribute'}, {'matches': {'suffix': '_url'}}])
+        req = self.site.path.get()
+        with self.text_response('{"eggs_url": "http://www.example.org/eggs"}'):
+            resp = await req
+        perma = resp.eggs
+        self.assertIsInstance(perma, PermalinkString)
+        self.assertIs(util.rag(perma, 'origin_request')._real_object, req)
+        self.assertEqual(perma, "http://www.example.org/eggs")
+        req2 = perma.get()
+        self.assertIsInstance(req2, Request)
+        self.assertAttrEqual(req2, 'url', "http://www.example.org/eggs")
+        self.assertIs(util.rag(req2, 'site')._real_object, self.site)
+
+    async def test_permalink_object(self):
+        self.read_restspec(permalink_object={'attr': 'permalink'})
+        req = self.site.path.get()
+        with self.text_response('{"permalink": "http://www.example.org/eggs"}'):
+            resp = await req
+        req2 = resp.get()
+        self.assertIsInstance(req2, Request)
+        self.assertAttrEqual(req2, 'url', "http://www.example.org/eggs")
+        self.assertIs(util.rag(req2, 'site')._real_object, self.site)
+
+
+class ParamsTests(RequestTests):
+    async def test_get_params(self):
+        req = self.site.path.get(spam="ham", eggs=42)
+        with self.text_response("0") as mock:
+            await req
+            self.assertRequestMade(
+                mock, 'GET', 'http://www.example.org/path',
+                params={'spam': 'ham', 'eggs': 42})
+
+    async def test_post_params(self):
+        req = self.site.path.post(spam="ham", eggs=42)
+        with self.text_response("0") as mock:
+            await req
+            self.assertRequestMade(
+                mock, 'POST', 'http://www.example.org/path',
+                params={'spam': 'ham', 'eggs': 42})
+
+    async def test_post_body(self):
+        req = self.site.path.post({'spam': "ham", 'eggs': 42}, param="val")
+        with self.text_response("0") as mock:
+            await req
+            self.assertRequestMade(
+                mock, 'POST', 'http://www.example.org/path',
+                params={'param': "val"}, data={'spam': 'ham', 'eggs': 42})
+
+
+class ValueTests(RequestTests):
     async def test_values(self):
         resp = await self.request('{"a": 42, "ham": ["eggs", "spam"]}')
         self.assertEqual(resp['a'], 42)
@@ -93,6 +169,10 @@ class RequestTests(Tests):
     async def test_await_twice(self):
         with self.text_response('{"a": 42, "ham": ["eggs", "spam"]}'):
             resp1 = await self.req
+        self.assertEqual(resp1['a'], 42)
+        self.assertEqual(resp1.a, 42)
+        self.assertEqual(resp1['ham'][0], "eggs")
+        self.assertEqual(resp1['ham'][1], "spam")
         resp2 = await self.req
         self.assertEqual(resp1['a'], 42)
         self.assertEqual(resp1.a, 42)
@@ -102,27 +182,6 @@ class RequestTests(Tests):
         self.assertEqual(resp2.a, 42)
         self.assertEqual(resp2['ham'][0], "eggs")
         self.assertEqual(resp2['ham'][1], "spam")
-
-    async def test_aiter(self):
-        resp = await self.request('{"ham": ["eggs", "spam"]}')
-        items = []
-        async for val in resp.ham:
-            items.append(val)
-        self.assertEqual(items, ['eggs', 'spam'])
-
-    async def test_aiter_direct(self):
-        resp = await self.request('["eggs", "spam"]')
-        items = []
-        async for val in resp:
-            items.append(val)
-        self.assertEqual(items, ['eggs', 'spam'])
-
-    async def test_aiter_direct_noawait(self):
-        with self.text_response('["eggs", "spam"]'):
-            items = []
-            async for val in self.req:
-                items.append(val)
-        self.assertEqual(items, ['eggs', 'spam'])
 
     async def test_resp_property_attr(self):
         with self.text_response('{"abc": "def"}', 200):
@@ -150,75 +209,28 @@ class RequestTests(Tests):
             self.assertEqual((await self.req[1][0]), 'def')
             self.assertEqual((await self.req[1][1]), 'xyz')
 
-    async def test_follow_request(self):
-        util.rag(self.site, 'spec').is_permalink_attr = self.matcher
-        with self.text_responses(
-                '{"thing": "http://www.example.org/other_res"}', '"spam"'):
-            self.assertEqual((await self.req.thing.get()), 'spam')
 
-    async def test_follow_request_attr(self):
-        util.rag(self.site, 'spec').is_permalink_attr = self.matcher
-        with self.text_responses(
-                '{"thing": "http://www.example.org/other_res"}',
-                '{"ham": "spam"}'):
-            self.assertEqual((await self.req.thing.get().ham), 'spam')
+class IterTests(RequestTests):
+    async def test_aiter(self):
+        resp = await self.request('{"ham": ["eggs", "spam"]}')
+        items = []
+        async for val in resp.ham:
+            items.append(val)
+        self.assertEqual(items, ['eggs', 'spam'])
 
-    async def test_follow_xsite(self):
-        util.rag(self.site, 'spec').is_permalink_attr = self.matcher
-        with self.text_response('{"thing": "http://www.example.com/"}'):
-            nextreq = await self.req.thing
-        with self.assertRaises(CrossOriginRequestError):
-            with self.text_response('"I am the danger"'):
-                await nextreq.get()
+    async def test_aiter_direct(self):
+        resp = await self.request('["eggs", "spam"]')
+        items = []
+        async for val in resp:
+            items.append(val)
+        self.assertEqual(items, ['eggs', 'spam'])
 
-    async def test_get_params(self):
-        req = self.site.path.get(spam="ham", eggs=42)
-        with self.text_response("0") as mock:
-            await req
-            self.assertRequestMade(
-                mock, 'GET', 'http://www.example.org/path',
-                params={'spam': 'ham', 'eggs': 42})
-
-    async def test_post_params(self):
-        req = self.site.path.post(spam="ham", eggs=42)
-        with self.text_response("0") as mock:
-            await req
-            self.assertRequestMade(
-                mock, 'POST', 'http://www.example.org/path',
-                params={'spam': 'ham', 'eggs': 42})
-
-    async def test_post_body(self):
-        req = self.site.path.post({'spam': "ham", 'eggs': 42}, param="val")
-        with self.text_response("0") as mock:
-            await req
-            self.assertRequestMade(
-                mock, 'POST', 'http://www.example.org/path',
-                params={'param': "val"}, data={'spam': 'ham', 'eggs': 42})
-
-    async def test_permalink_attr(self):
-        self.read_restspec(permalink_attribute=[
-            {'context': 'attribute'}, {'matches': {'suffix': '_url'}}])
-        req = self.site.path.get()
-        with self.text_response('{"eggs_url": "http://www.example.org/eggs"}'):
-            resp = await req
-        perma = resp.eggs
-        self.assertIsInstance(perma, PermalinkString)
-        self.assertIs(util.rag(perma, 'origin_request')._real_object, req)
-        self.assertEqual(perma, "http://www.example.org/eggs")
-        req2 = perma.get()
-        self.assertIsInstance(req2, Request)
-        self.assertAttrEqual(req2, 'url', "http://www.example.org/eggs")
-        self.assertIs(util.rag(req2, 'site')._real_object, self.site)
-
-    async def test_permalink_object(self):
-        self.read_restspec(permalink_object={'attr': 'permalink'})
-        req = self.site.path.get()
-        with self.text_response('{"permalink": "http://www.example.org/eggs"}'):
-            resp = await req
-        req2 = resp.get()
-        self.assertIsInstance(req2, Request)
-        self.assertAttrEqual(req2, 'url', "http://www.example.org/eggs")
-        self.assertIs(util.rag(req2, 'site')._real_object, self.site)
+    async def test_aiter_direct_noawait(self):
+        with self.text_response('["eggs", "spam"]'):
+            items = []
+            async for val in self.req:
+                items.append(val)
+        self.assertEqual(items, ['eggs', 'spam'])
 
     async def test_paginated_list_after_link(self):
         self.read_restspec(paginated_object={
@@ -235,6 +247,8 @@ class RequestTests(Tests):
                 lis.append(item)
         self.assertEqual(lis, [1, 2, 3, 4, 5, 6])
 
+
+class StatusTests(RequestTests):
     async def test_raise_http404(self):
         with self.text_response('{"docs": "someplace"}', status=404):
             with self.assertRaises(errors.http.NotFound) as r:
