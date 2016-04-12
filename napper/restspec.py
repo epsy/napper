@@ -78,6 +78,7 @@ class Matcher:
             if 'pattern' in obj:
                 pat = obj['pattern']
                 ret.pattern = re.compile(pat)
+                ret.hint_fmt = hint
             else:
                 if 'prefix' not in obj and 'suffix' not in obj:
                     raise ValueError('Need at least a prefix and/or suffix, '
@@ -90,7 +91,7 @@ class Matcher:
                     '^{}.*{}$'.format(re.escape(prefix), re.escape(suffix)))
         return ret
 
-    def __call__(self, value, context):
+    def __call__(self, value):
         if self.pattern is None:
             return False
         return bool(self.pattern.match(value))
@@ -305,7 +306,7 @@ class Fetcher:
     @boolean_result
     @convert_arg(Conversion.MATCHER)
     def step_matches(self, arg, value, context):
-        return arg(value, context)
+        return arg(value)
 
     @boolean_result
     @convert_arg(Conversion.WHOLE_CONDITIONAL)

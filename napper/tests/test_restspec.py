@@ -4,6 +4,7 @@
 
 import io
 import json
+import re
 
 from .. import restspec
 from ..errors import UnknownParameters
@@ -295,3 +296,139 @@ class ConditionalTests(Tests):
         c = self.c([{'context': 'attribute'}, {'matches': {'suffix': '_url'}}])
         self.assertEqual(c.attr_name_hint('abc'), 'abc_url')
         self.assertEqual(c.attr_name_hint('xyz'), 'xyz_url')
+
+    def test_nohint(self):
+        cs = [
+            self.c(True),
+            self.c([{'attr': 'abc'}, {'attr': 'def'}, {'is_eq': 'ghi'}]),
+            self.c([{'attr': 'abc'}, {'is_eq': 123}]),
+            self.c([{'context': [{'attr': 'abc'}, {'attr': 'def'}]},
+                    {'is_eq': 'ghi'}]),
+            self.c([{'context': {'attr': 'abc'}}, {'is_eq': 123}]),
+            self.c([{'context': 'value'}, {'is_eq': 123}]),
+            self.c([{'context': 'attribute'}, {'is_eq': 123}]),
+        ]
+        for c in cs:
+            with self.assertRaises(restspec.NoValue):
+                c.attr_name_hint("test")
+
+
+class MatcherTests(Tests):
+    def m(self, spec):
+        return restspec.Matcher.from_restspec(self.to_config_dict(spec))
+
+    def test_false(self):
+        m = self.m(None)
+        self.assertFalse(m('abcdef'))
+        self.assertFalse(m(''))
+        self.assertEqual(m.pattern, None)
+
+    def test_true(self):
+        m = self.m("any")
+        self.assertTrue(m('abcdef'))
+        self.assertTrue(m(''))
+        self.assertEqual(m.pattern, re.compile(''))
+
+    def test_pattern(self):
+        m = self.m({'pattern': 'abc.*def'})
+        self.assertTrue(m('abcdef'))
+        self.assertTrue(m('abcxyzdef'))
+        self.assertTrue(m('abc123def'))
+        self.assertFalse(m('abc'))
+        self.assertFalse(m('abcxyz'))
+        self.assertFalse(m('xyzdef'))
+        self.assertFalse(m('def'))
+        self.assertFalse(m('xyz'))
+        self.assertFalse(m(''))
+        self.assertEqual(m.pattern, re.compile('abc.*def'))
+
+    def test_prefix(self):
+        m = self.m({'prefix': 'abc'})
+        self.assertTrue(m('abc'))
+        self.assertTrue(m('abcdef'))
+        self.assertTrue(m('abc123'))
+        self.assertFalse(m(''))
+        self.assertFalse(m('def'))
+        self.assertFalse(m('123'))
+        self.assertFalse(m('defabc'))
+        self.assertEqual(m.pattern, re.compile('^abc.*$'))
+
+    def test_suffix(self):
+        m = self.m({'suffix': 'xyz'})
+        self.assertTrue(m('xyz'))
+        self.assertTrue(m('abcdefxyz'))
+        self.assertTrue(m('123xyz'))
+        self.assertFalse(m('xyzabc'))
+        self.assertFalse(m(''))
+        self.assertFalse(m('abc'))
+        self.assertFalse(m('123'))
+        self.assertEqual(m.pattern, re.compile('^.*xyz$'))
+
+    def test_prefix_suffix(self):
+        m = self.m({'prefix': 'abc', 'suffix': 'xyz'})
+        self.assertTrue(m('abcxyz'))
+        self.assertTrue(m('abcdefxyz'))
+        self.assertTrue(m('abc123xyz'))
+        self.assertFalse(m('xyzabc'))
+        self.assertFalse(m(''))
+        self.assertFalse(m('abc'))
+        self.assertFalse(m('123'))
+        self.assertFalse(m('xyz'))
+        self.assertFalse(m('abcxyz123'))
+        self.assertFalse(m('123abcxyz'))
+        self.assertEqual(m.pattern, re.compile('^abc.*xyz$'))
+
+    def test_prefix_suffix_escape(self):
+        m = self.m({'prefix': '$', 'suffix': '$'})
+        self.assertTrue(m('$abcdef$'))
+        self.assertTrue(m('$$'))
+        self.assertTrue(m('$123$'))
+        self.assertFalse(m('abc$'))
+        self.assertFalse(m('$abc'))
+        self.assertFalse(m('$'))
+        self.assertEqual(m.pattern, re.compile(r'^\$.*\$$'))
+
+    def test_nospec(self):
+        with self.assertRaises(ValueError):
+            self.m({})
+
+    def test_pat_nohint(self):
+        m = self.m({'pattern': 'abc.*'})
+        with self.assertRaises(restspec.NoValue):
+            m.hint('test')
+
+    def test_pat_expl_hint(self):
+        m = self.m({'pattern': 'abc.*', 'hint': 'abc{}def'})
+        self.assertEqual(m.hint('test'), 'abctestdef')
+        self.assertEqual(m.hint('abc'), 'abcabcdef')
+        self.assertEqual(m.hint(''), 'abcdef')
+
+    def test_prefix_hint(self):
+        m = self.m({'prefix': 'abc'})
+        self.assertEqual(m.hint('test'), 'abctest')
+        self.assertEqual(m.hint(''), 'abc')
+        self.assertEqual(m.hint('abc'), 'abcabc')
+
+    def test_suffix_hint(self):
+        m = self.m({'suffix': 'abc'})
+        self.assertEqual(m.hint('test'), 'testabc')
+        self.assertEqual(m.hint(''), 'abc')
+        self.assertEqual(m.hint('abc'), 'abcabc')
+
+    def test_prefix_suffix_hint(self):
+        m = self.m({'prefix': 'abc', 'suffix': 'xyz'})
+        self.assertEqual(m.hint('test'), 'abctestxyz')
+        self.assertEqual(m.hint(''), 'abcxyz')
+        self.assertEqual(m.hint('abc'), 'abcabcxyz')
+
+    def test_prefix_expl_hint(self):
+        m = self.m({'prefix': 'abc', 'hint': 'abc{}123'})
+        self.assertEqual(m.hint("xyz"), "abcxyz123")
+
+    def test_suffix_expl_hint(self):
+        m = self.m({'suffix': 'abc', 'hint': '123{}abc'})
+        self.assertEqual(m.hint("xyz"), "123xyzabc")
+
+    def test_prefix_suffix_expl_hint(self):
+        m = self.m({'prefix': 'abc', 'suffix': 'xyz', 'hint': 'abcxyz{}abcxyz'})
+        self.assertEqual(m.hint("123"), "abcxyz123abcxyz")
