@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+
+	<head>
+		<meta charset="utf-8">
+
+		<title>napper: Python 3.5 and easy requesting</title>
+
+		<meta name="description" content="A Python 3.5 library for issuing ReST requests">
+		<meta name="author" content="Yann Kaiser">
+
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+
+		<link rel="stylesheet" href="css/reveal.css">
+		<link rel="stylesheet" href="css/theme/night.css" id="theme">
+
+		<!-- Code syntax highlighting -->
+		<link rel="stylesheet" href="lib/css/zenburn.css">
+
+		<!-- Printing and PDF exports -->
+		<script>
+			var link = document.createElement( 'link' );
+			link.rel = 'stylesheet';
+			link.type = 'text/css';
+			link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+			document.getElementsByTagName( 'head' )[0].appendChild( link );
+		</script>
+
+		<!--[if lt IE 9]>
+		<script src="lib/js/html5shiv.js"></script>
+		<![endif]-->
+	</head>
+
+	<body>
+
+		<div class="reveal">
+
+			<!-- Any section element inside of this container is displayed as a slide -->
+			<div class="slides">
+				<section>
+					<section>
+						<h1>napper</h1>
+						<h3></h3>
+						<p>
+							<small>A ReST client created by <a href="https://github.com/epsy">Yann Kaiser</a> (me)</small>
+						</p>
+					</section>
+					<section>
+						<div style="text-align:left">
+							<h2>Me</h2>
+							<p>CS student at EFREI ; Intern at Criteo</p>
+							<p><a href="https://github.com/epsy">https://github.com/epsy</a></p>
+							<p><a href="http://clize.readthedocs.org/">clize</a>:<br>
+								<code><pre>def hello_world(name=None, *, no_capitalize=False):</pre></code>
+								<code><pre>$ python hello.py dave --no-capitalize</pre></code>
+						</div>
+					</section>
+				</section>
+
+				<section>
+					<section>
+						<h2>So what's napper?</h2>
+						<p class=fragment>Or rather, what is it not?</p>
+					</section>
+					<section>
+						<h3>urllib</h3>
+						<p><small>A.K.A. <code>urlib2</code>, <code>urllib.request</code>,
+											<code>six.moves.urllib.request</code></small></p>
+						<code><pre data-trim>
+urllib example (~20 lines explained roughly):
+log in to reddit and print the first private message
+						</pre></code>
+					</section>
+					<section>
+						<h3>requests</h3>
+						<p><small>A.K.A. Phew, I don't actually have to use urllib</small></p>
+						<code><pre data-trim>
+requests example (~15 lines explained quickly)
+log in to reddit and print the first private message
+						</pre></code>
+					</section>
+					<section>
+						<h3>aiohttp</h3>
+						<p><small>A.K.A. Hey I can use <code>asyncio</code> now!</small></p>
+						<code><pre data-trim>
+aiohttp example? (~15 lines quickly compared with previous)
+log in to reddit and print the first private message
+						</pre></code>
+					</section>
+				</section>
+
+				<section>
+					<section>
+						<h2>No really, what is it?</h2>
+						<p class=fragment>ReST to Python mapper</p>
+						<p class=fragment>Python &rArr; Need to use a pun</p>
+						<p class=fragment>ReST &equiv; to rest &equiv; to (take a) nap</p>
+						<p class=fragment>nap + mapper = napper</p>
+					</section>
+					<section>
+						<code><pre data-trim>
+napper example! (~10 lines walked through)
+log in to reddit and print the first private message
+highlight the use of "async def", "await" and "loop.run_until_complete",
+the first two being Python 3.5 features
+						</pre></code>
+					</section>
+					<section>
+						<p><small>(If this was Python 3.4)</small></p>
+						<code><pre data-trim>
+same example as if it was in Python 3.4! (~10 lines walked through)
+highlight of the use of "yield from"
+						</pre></code>
+					</section>
+				</section>
+
+				<section>
+					<section>
+						<h2>Advanced uses</h2>
+						<code><pre data-trim>
+example involving "async for" and follow-up requests
+most likely example from README
+(code walk-through, ~15 lines)
+						</pre></code>
+					</section>
+					<section>
+						<code><pre data-trim>
+example: Not using napper.apis but just SiteFactory
+						</pre></code>
+					</section>
+					<section>
+						<code><pre data-trim>
+overview of a restspec file?
+						</pre></code>
+					</section>
+				</section>
+
+				<section>
+					<section>
+						<h2>The Bad News</h2>
+						<p class=fragment>It's for Python 3.5+ only</p>
+						<p class=fragment>It's in alpha stage</p>
+						<p class=fragment>It's not documented yet</p>
+					</section>
+					<section>
+						<h2>The Good News</h2>
+						<p class=fragment>It's for Python 3.5+ only</p>
+						<p class=fragment>It's in alpha stage</p>
+						<p class=fragment>It has 90%+ test coverage</p>
+					</section>
+				</section>
+
+				<section>
+					<h1>napper</h1>
+					<p><code>pip install --user napper</code></p>
+					<p><a href="https://github.com/epsy/napper">https://github.com/epsy/napper</a></p>
+					<p><a href="https://epsy.github.io/napper/">https://epsy.github.io/napper/</a></p>
+					<h2>Questions?</h2>
+
+			</div>
+
+		</div>
+
+		<script src="lib/js/head.min.js"></script>
+		<script src="js/reveal.js"></script>
+
+		<script>
+
+			// Full list of configuration options available at:
+			// https://github.com/hakimel/reveal.js#configuration
+			Reveal.initialize({
+				controls: true,
+				progress: true,
+				history: true,
+				center: true,
+
+				transition: 'slide', // none/fade/slide/convex/concave/zoom
+
+				// Optional reveal.js plugins
+				dependencies: [
+					{ src: 'lib/js/classList.js', condition: function() { return !document.body.classList; } },
+					{ src: 'plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+					{ src: 'plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+					{ src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+					{ src: 'plugin/zoom-js/zoom.js', async: true },
+					{ src: 'plugin/notes/notes.js', async: true }
+				]
+			});
+
+		</script>
+
+	</body>
+</html>
+<!-- vim: set ts=2 sts=2 sw=2 noet lcs+=tab\:\ \ : -->
