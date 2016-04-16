@@ -1,0 +1,4 @@
+[submodule "slides"]
+    path = slides
+    url = https://github.com/epsy/napper.git
+    branch = gh-slides
