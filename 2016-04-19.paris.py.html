@@ -69,25 +69,81 @@
 						<h3>urllib</h3>
 						<p><small>A.K.A. <code>urlib2</code>, <code>urllib.request</code>,
 											<code>six.moves.urllib.request</code></small></p>
-						<code><pre data-trim>
-urllib example (~20 lines explained roughly):
-log in to reddit and print the first private message
-						</pre></code>
+						<pre><code class="language-python" data-trim style="line-height: 1">
+passwords = urllib.request.HTTPPasswordMgrWithPriorAuth()
+passwords.add_password("reddit", "https://www.reddit.com/",
+                       CLIENT_ID, CLIENT_SECRET,
+                       is_authenticated=True)
+opener = urllib.request.build_opener(
+    urllib.request.HTTPBasicAuthHandler(passwords))
+opener.addheaders = [('User-agent', 'A urllib example/0.1')]
+
+if not access_token:
+    r = opener.open("https://www.reddit.com/api/v1/access_token",
+        urllib.parse.urlencode({
+            'grant_type': 'authorization_code',
+            'code': USER_CODE,
+            'redirect_uri': REDIR_URL,
+        }).encode('utf8'))
+
+    with r:
+        doc = json.load(io.TextIOWrapper(r, 'utf8'))
+        print(doc)
+        access_token = doc['access_token']
+opener.addheaders.append(("Authorization", "bearer " + access_token))
+
+msgs = opener.open("https://oauth.reddit.com/message/sent?limit=1")
+print(msgs.read().decode('utf8'))
+						</code></pre>
 					</section>
+
 					<section>
 						<h3>requests</h3>
 						<p><small>A.K.A. Phew, I don't actually have to use urllib</small></p>
-						<code><pre data-trim>
-requests example (~15 lines explained quickly)
-log in to reddit and print the first private message
+						<pre><code class="language-python" data-trim>
+session = requests.Session()
+session.headers['User-agent'] = "requests example/0.1"
+
+if not access_token:
+    r = session.post(
+        "https://www.reddit.com/api/v1/access_token",
+        { 'grant_type': 'authorization_code', 'code': USER_CODE,
+          'redirect_uri': REDIR_URL })
+    doc = r.json()
+    access_token = doc['access_token']
+session.headers['Authorization'] = "bearer " + access_token
+
+r = session.get("https://oauth.reddit.com/message/sent?limit=1")
+for msg in r.json()['data']['children']:
+    msgdata = msg['data']
+    print(msgdata["subject"], "\n", msgdata["body"])
 						</pre></code>
 					</section>
+
 					<section>
 						<h3>aiohttp</h3>
 						<p><small>A.K.A. Hey I can use <code>asyncio</code> now!</small></p>
-						<code><pre data-trim>
-aiohttp example? (~15 lines quickly compared with previous)
-log in to reddit and print the first private message
+						<pre><code data-trim>
+session = aiohttp.ClientSession(headers={'User-agent': "aiohttp example/0.1"})
+
+async def req():
+    global access_token
+    if not access_token:
+        r = await session.post(
+            "https://www.reddit.com/api/v1/access_token",
+            { 'grant_type': 'authorization_code', 'code': USER_CODE,
+              'redirect_uri': REDIR_URL })
+        doc = await r.json()
+        access_token = doc['access_token']
+    session._default_headers['Authorization'] = "bearer " + access_token
+
+    r = await session.get("https://oauth.reddit.com/message/sent?limit=1")
+    for msg in (await r.json())['data']['children']:
+        msgdata = msg['data']
+        print(msgdata["subject"], "\n", msgdata["body"])
+
+with session:
+    asyncio.get_event_loop().run_until_complete(req())
 						</pre></code>
 					</section>
 				</section>
@@ -155,7 +211,7 @@ overview of a restspec file?
 
 				<section>
 					<h1>napper</h1>
-					<p><code>pip install --user napper</code></p>
+					<p><code>python3.5 -m pip install --user napper</code></p>
 					<p><a href="https://github.com/epsy/napper">https://github.com/epsy/napper</a></p>
 					<p><a href="https://epsy.github.io/napper/">https://epsy.github.io/napper/</a></p>
 					<h2>Questions?</h2>
