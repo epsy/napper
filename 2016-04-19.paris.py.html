@@ -57,7 +57,11 @@
 						<p>
 							<small>A ReST client created by <a href="https://github.com/epsy">Yann Kaiser</a> (me)</small>
 						</p>
+						<aside class="notes">
+							0:15
+						</aside>
 					</section>
+
 					<section>
 						<div style="text-align:left">
 							<h2>Me</h2>
@@ -67,6 +71,12 @@
 								<code><pre>def hello_world(name=None, *, no_capitalize=False):</pre></code>
 								<code><pre>$ python hello.py dave --no-capitalize</pre></code>
 						</div>
+						<aside class="notes">
+							0:45
+							<br>
+							Étudiant en informatique @ EFREI, Stagiaire en ingé logi @ criteo
+							<br>
+							clize
 					</section>
 				</section>
 
@@ -74,7 +84,13 @@
 					<section>
 						<h2>So what's napper?</h2>
 						<p class=fragment>Or rather, what is it not?</p>
+						<aside class="notes">
+						1:25
+						<br>
+						Qu'est-ce que c'est napper? Client REST HTTP<br>
+						+pas =&gt; ex HTTP non-spécialisé
 					</section>
+
 					<section>
 						<h3>urllib</h3>
 						<p><small>A.K.A. <code>urlib2</code>, <code>urllib.request</code>,
@@ -104,12 +120,22 @@ if not access_token:
 opener.addheaders.append(("Authorization", "bearer " + access_token))
 
 msgs = opener.open("https://oauth.reddit.com/message/sent?limit=1")
-print(msgs.read().decode('utf8'))
+<span class="fragment highlight-current-bg">print(msgs.read().decode('utf8'))</span>
 						</code></pre>
+						<aside class="notes">
+							3:25
+							<br>
+							urllib; exemple avec login reddit + lire message envoyé
+						</aside>
 					</section>
 
 					<section>
 						<img src="./pydocs-userequests.png"/>
+						<aside class="notes">
+							3:35
+							<br>
+							3.4 =&gt; la doc dit va voir ailleurs
+						</aside>
 					</section>
 
 					<section>
@@ -130,10 +156,13 @@ if not access_token:
 session.headers['Authorization'] = "bearer " + access_token
 
 r = session.get("https://oauth.reddit.com/message/sent?limit=1")
-for msg in r.json()<span class="fragment highlight-current-bg" data-fragment-index=5>['data']['children']</span>:
-    msgdata = <span class="fragment highlight-current-bg" data-fragment-index=5>msg['data']</span>
-    print(msgdata["subject"], "\n", msgdata["body"])
+for msg in r.json()['data']['children']:
+    msgdata = msg['data']
+    print(<span class="fragment highlight-current-bg" data-fragment-index=5>msgdata["subject"]</span>, "\n", <span class="fragment highlight-current-bg" data-fragment-index=5>msgdata["body"]</span>)
 						</pre></code>
+						<aside class="notes">
+							4:50
+						</aside>
 					</section>
 
 					<section>
@@ -162,15 +191,46 @@ with session:
     <span class="fragment highlight-current-bg">asyncio.get_event_loop().run_until_complete(req())</span>
 						</pre></code>
 					</section>
+					<aside class="notes">
+						5:05
+					</aside>
 				</section>
 
 				<section>
 					<section>
 						<h2>No really, what is it?</h2>
+						<p>It specializes in ReST HTTP requests</p>
 						<p class=fragment>ReST to Python mapper</p>
 						<p class=fragment>Python &rArr; Need to use a pun</p>
 						<p class=fragment>ReST &equiv; to rest &equiv; to (take a) nap</p>
 						<p class=fragment>nap + mapper = napper</p>
+						<aside class="notes">
+							6:00
+							<br>
+							comp avec ORM
+						</aside>
+					</section>
+
+					<section>
+						<h4>Get a cookie from httpbin.org</h4>
+						<pre><code data-trim class=python data-noescape>
+from napper import SessionFactory
+
+<span class="fragment highlight-current-bg" data-fragment-index=1>httpbin = SessionFactory.from_address('http://httpbin.org/')</span>
+
+async def using_httpbin():
+    <span class="fragment highlight-current-bg" data-fragment-index=2>with httpbin() as site:</span>
+        # GET http://httpbin.org/cookies/set?spam=ham
+        print(<span class="fragment highlight-current-bg" data-fragment-index=5>await</span> <span class="fragment highlight-current-bg" data-fragment-index=3>site.cookies.set.get(spam='ham')</span>)
+        # GET http://httpbin.org/cookies
+        print(<span class="fragment highlight-current-bg" data-fragment-index=5>await</span> <span class="fragment highlight-current-bg" data-fragment-index=4>site.cookies.get()</span>)
+
+asyncio.get_event_loop().run_until_complete(<span class="fragment highlight-current-bg">using_httpbin()</span>)
+						</code></pre>
+						<aside class="notes">
+							8:30
+							<br>
+							fin: dénoter le "async"
 					</section>
 
 					<section>
@@ -178,17 +238,20 @@ with session:
 						<pre><code data-trim class="language-python" data-noescape>
 <span class="fragment highlight-current-bg" data-fragment-index=2>from napper.apis import reddit</span>
 
-<span class="fragment highlight-current-bg" data-fragment-index=1>async</span> def napper_example():
-    <span class="fragment highlight-current-bg" data-fragment-index=2>async with reddit() as site:</span>
+async def napper_example():
+    async with <span class="fragment highlight-current-bg" data-fragment-index=2>reddit()</span> as site:
         <span class="fragment highlight-current-bg" data-fragment-index=4>async for</span> msg in <span class="fragment highlight-current-bg" data-fragment-index=3>site.message.sent.get(limit=1)</span>:
             print(<span class="fragment highlight-current-bg" data-fragment-index=5>msg["subject"]</span>, "\n", <span class="fragment highlight-current-bg" data-fragment-index=5>msg["body"]</span>)
 
 <span class="fragment highlight-current-bg" data-fragment-index=6>asyncio.get_event_loop().run_until_complete</span>(napper_example())
 						</code></pre>
+						<aside class="notes">
+							10:15
+							<br>
+							Pas besoin d'écrire "children" et "data"
+						</aside>
 					</section>
-				</section>
 
-				<section>
 					<section>
 						<h4>Show the most popular repository of "gist" authors</h4>
 						<pre><code data-trim class=python data-noescape>
@@ -206,22 +269,9 @@ async def getstargazers():
 
 asyncio.get_event_loop().run_until_complete(getstargazers())
 						</code></pre>
-					</section>
-
-					<section>
-						<h4>Get a cookie from httpbin.org</h4>
-						<pre><code data-trim class=python data-noescape>
-from napper import SessionFactory
-
-httpbin = <span class="fragment highlight-current-bg">SessionFactory.from_address('http://httpbin.org/')</span>
-
-async def using_httpbin():
-    with httpbin() as site:
-        print(await site.cookies.set.get(spam='ham'))
-        print(await site.cookies.get())
-
-asyncio.get_event_loop().run_until_complete(using_httpbin())
-						</code></pre>
+						<aside class="notes">
+							12:00
+						</aside>
 					</section>
 				</section>
 
@@ -231,12 +281,18 @@ asyncio.get_event_loop().run_until_complete(using_httpbin())
 						<p class=fragment>It's in alpha stage</p>
 						<p class=fragment>It's for Python 3.5+ only</p>
 						<p class=fragment>It's not documented yet</p>
+						<aside class="notes">
+							12:45
+						</aside>
 					</section>
 					<section>
 						<h2>The Good News</h2>
 						<p class=fragment>It's in alpha stage</p>
 						<p class=fragment>It's for Python 3.5+ only</p>
 						<p class=fragment>It's easy to use anyway</p>
+						<aside class="notes">
+							13:30
+						</aside>
 					</section>
 					<section>
 						<h2>What I'd still like to add</h2>
@@ -246,6 +302,9 @@ asyncio.get_event_loop().run_until_complete(using_httpbin())
 						<p class=fragment>XML support?
 						<p class=fragment>Web hook/callback support?
 						<p class=fragment>You tell me!
+						<aside class="notes">
+							14:30
+						</aside>
 					</section>
 				</section>
 
@@ -256,6 +315,9 @@ asyncio.get_event_loop().run_until_complete(using_httpbin())
 					<p>Slides: <a href="https://epsy.github.io/napper/">https://epsy.github.io/napper/</a>
 					<p>Chat: <a href="https://gitter.im/epsy/napper">https://gitter.im/epsy/napper</a>
 					<h2>Questions?</h2>
+					<aside class="notes">
+						15:00
+					</aside>
 				</section>
 			</div>
 
