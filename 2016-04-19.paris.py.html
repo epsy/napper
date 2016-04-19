@@ -32,6 +32,16 @@
 		<!--[if lt IE 9]>
 		<script src="lib/js/html5shiv.js"></script>
 		<![endif]-->
+
+		<style type="text/css">
+			.reveal .slides section .fragment.highlight-current-bg {
+				opacity: 1;
+				visibility: visible;
+			}
+			.reveal .slides section .fragment.highlight-current-bg.current-fragment {
+				background: hsl(60, 100%, 20%);
+			}
+		</style>
 	</head>
 
 	<body>
@@ -69,25 +79,26 @@
 						<h3>urllib</h3>
 						<p><small>A.K.A. <code>urlib2</code>, <code>urllib.request</code>,
 											<code>six.moves.urllib.request</code></small></p>
-						<pre><code class="language-python" data-trim style="line-height: 1">
-passwords = urllib.request.HTTPPasswordMgrWithPriorAuth()
+						<pre><code class="language-python" data-trim data-noescape style="line-height: 1">
+<span class="fragment highlight-current-bg">passwords = urllib.request.HTTPPasswordMgrWithPriorAuth()
 passwords.add_password("reddit", "https://www.reddit.com/",
                        CLIENT_ID, CLIENT_SECRET,
                        is_authenticated=True)
 opener = urllib.request.build_opener(
-    urllib.request.HTTPBasicAuthHandler(passwords))
+    urllib.request.HTTPBasicAuthHandler(passwords))</span>
 opener.addheaders = [('User-agent', 'A urllib example/0.1')]
 
 if not access_token:
-    r = opener.open("https://www.reddit.com/api/v1/access_token",
-        urllib.parse.urlencode({
+    r = <span class="fragment highlight-current-bg">opener.open(</span>
+        "https://www.reddit.com/api/v1/access_token",
+        <span class="fragment highlight-current-bg">urllib.parse.urlencode({
             'grant_type': 'authorization_code',
             'code': USER_CODE,
             'redirect_uri': REDIR_URL,
-        }).encode('utf8'))
+        }).encode('utf8')</span>)
 
     with r:
-        doc = json.load(io.TextIOWrapper(r, 'utf8'))
+        doc = json.load(<span class="fragment highlight-current-bg">io.TextIOWrapper(r, 'utf8')</span>)
         print(doc)
         access_token = doc['access_token']
 opener.addheaders.append(("Authorization", "bearer " + access_token))
@@ -100,22 +111,23 @@ print(msgs.read().decode('utf8'))
 					<section>
 						<h3>requests</h3>
 						<p><small>A.K.A. Phew, I don't actually have to use urllib</small></p>
-						<pre><code class="language-python" data-trim>
+						<pre><code class="language-python" data-trim data-noescape>
 session = requests.Session()
 session.headers['User-agent'] = "requests example/0.1"
 
 if not access_token:
-    r = session.post(
+    r = <span class="fragment highlight-current-bg" data-fragment-index=1>session.post</span>(
         "https://www.reddit.com/api/v1/access_token",
-        { 'grant_type': 'authorization_code', 'code': USER_CODE,
-          'redirect_uri': REDIR_URL })
-    doc = r.json()
+        <span class="fragment highlight-current-bg" data-fragment-index=2>{ 'grant_type': 'authorization_code', 'code': USER_CODE,
+          'redirect_uri': REDIR_URL }</span>,
+        <span class="fragment highlight-current-bg" data-fragment-index=3>auth=(CLIENT_ID, CLIENT_SECRET)</span>)
+    doc = <span class="fragment highlight-current-bg" data-fragment-index=4>r.json()</span>
     access_token = doc['access_token']
 session.headers['Authorization'] = "bearer " + access_token
 
 r = session.get("https://oauth.reddit.com/message/sent?limit=1")
-for msg in r.json()['data']['children']:
-    msgdata = msg['data']
+for msg in r.json()<span class="fragment highlight-current-bg" data-fragment-index=5>['data']['children']</span>:
+    msgdata = <span class="fragment highlight-current-bg" data-fragment-index=5>msg['data']</span>
     print(msgdata["subject"], "\n", msgdata["body"])
 						</pre></code>
 					</section>
@@ -123,27 +135,27 @@ for msg in r.json()['data']['children']:
 					<section>
 						<h3>aiohttp</h3>
 						<p><small>A.K.A. Hey I can use <code>asyncio</code> now!</small></p>
-						<pre><code data-trim>
+						<pre><code data-trim data-noescape>
 session = aiohttp.ClientSession(headers={'User-agent': "aiohttp example/0.1"})
 
-async def req():
+<span class="fragment highlight-current-bg" data-fragment-index=1>async def</span> req():
     global access_token
     if not access_token:
-        r = await session.post(
+        r = <span class="fragment highlight-current-bg" data-fragment-index=1>await</span> session.post(
             "https://www.reddit.com/api/v1/access_token",
             { 'grant_type': 'authorization_code', 'code': USER_CODE,
               'redirect_uri': REDIR_URL })
-        doc = await r.json()
+        doc = <span class="fragment highlight-current-bg" data-fragment-index=1>await</span> r.json()
         access_token = doc['access_token']
     session._default_headers['Authorization'] = "bearer " + access_token
 
-    r = await session.get("https://oauth.reddit.com/message/sent?limit=1")
-    for msg in (await r.json())['data']['children']:
+    r = <span class="fragment highlight-current-bg" data-fragment-index=1>await</span> session.get("https://oauth.reddit.com/message/sent?limit=1")
+    for msg in (<span class="fragment highlight-current-bg" data-fragment-index=1>await</span> r.json())['data']['children']:
         msgdata = msg['data']
         print(msgdata["subject"], "\n", msgdata["body"])
 
 with session:
-    asyncio.get_event_loop().run_until_complete(req())
+    <span class="fragment highlight-current-bg">asyncio.get_event_loop().run_until_complete(req())</span>
 						</pre></code>
 					</section>
 				</section>
@@ -156,66 +168,91 @@ with session:
 						<p class=fragment>ReST &equiv; to rest &equiv; to (take a) nap</p>
 						<p class=fragment>nap + mapper = napper</p>
 					</section>
+
 					<section>
-						<code><pre data-trim>
-napper example! (~10 lines walked through)
-log in to reddit and print the first private message
-highlight the use of "async def", "await" and "loop.run_until_complete",
-the first two being Python 3.5 features
-						</pre></code>
-					</section>
-					<section>
-						<p><small>(If this was Python 3.4)</small></p>
-						<code><pre data-trim>
-same example as if it was in Python 3.4! (~10 lines walked through)
-highlight of the use of "yield from"
-						</pre></code>
+						<h4>Example: Reading a sent private message from reddit</h4>
+						<pre><code data-trim class="language-python" data-noescape>
+<span class="fragment highlight-current-bg" data-fragment-index=2>from napper.apis import reddit</span>
+
+<span class="fragment highlight-current-bg" data-fragment-index=1>async</span> def napper_example():
+    <span class="fragment highlight-current-bg" data-fragment-index=2>async with reddit() as site:</span>
+        <span class="fragment highlight-current-bg" data-fragment-index=4>async for</span> msg in <span class="fragment highlight-current-bg" data-fragment-index=3>site.message.sent.get(limit=1)</span>:
+            print(<span class="fragment highlight-current-bg" data-fragment-index=5>msg["subject"]</span>, "\n", <span class="fragment highlight-current-bg" data-fragment-index=5>msg["body"]</span>)
+
+<span class="fragment highlight-current-bg" data-fragment-index=6>asyncio.get_event_loop().run_until_complete</span>(napper_example())
+						</code></pre>
 					</section>
 				</section>
 
 				<section>
 					<section>
-						<h2>Advanced uses</h2>
-						<code><pre data-trim>
-example involving "async for" and follow-up requests
-most likely example from README
-(code walk-through, ~15 lines)
-						</pre></code>
+						<h4>Show the most popular repository of "gist" authors</h4>
+						<pre><code data-trim class=python data-noescape>
+from napper.apis import github
+
+async def getstargazers():
+    with github() as site:
+        async for gist in <span class="fragment highlight-current-bg">site.gists.get()</span>:
+            try:
+                repo = await <span class="fragment highlight-current-bg">gist.owner.repos_url.get()[0]</span>
+            except AttributeError, IndexError:
+                pass # No owner or no repos
+            print(<span class="fragment highlight-current-bg">"{0.owner.login} {1.name} {1.stargazers_count}"
+                  .format(gist, repo)</span>)
+
+asyncio.get_event_loop().run_until_complete(getstargazers())
+						</code></pre>
 					</section>
+
 					<section>
-						<code><pre data-trim>
-example: Not using napper.apis but just SiteFactory
-						</pre></code>
-					</section>
-					<section>
-						<code><pre data-trim>
-overview of a restspec file?
-						</pre></code>
+						<h4>Get a cookie from httpbin.org</h4>
+						<pre><code data-trim class=python data-noescape>
+from napper import SessionFactory
+
+httpbin = <span class="fragment highlight-current-bg">SessionFactory.from_address('http://httpbin.org/')</span>
+
+async def using_httpbin():
+    with httpbin() as site:
+        print(await site.cookies.set.get(spam='ham'))
+        print(await site.cookies.get())
+
+asyncio.get_event_loop().run_until_complete(using_httpbin())
+						</code></pre>
 					</section>
 				</section>
 
 				<section>
 					<section>
 						<h2>The Bad News</h2>
-						<p class=fragment>It's for Python 3.5+ only</p>
 						<p class=fragment>It's in alpha stage</p>
+						<p class=fragment>It's for Python 3.5+ only</p>
 						<p class=fragment>It's not documented yet</p>
 					</section>
 					<section>
 						<h2>The Good News</h2>
-						<p class=fragment>It's for Python 3.5+ only</p>
 						<p class=fragment>It's in alpha stage</p>
-						<p class=fragment>It has 90%+ test coverage</p>
+						<p class=fragment>It's for Python 3.5+ only</p>
+						<p class=fragment>It's easy to use anyway</p>
+					</section>
+					<section>
+						<h2>What I'd still like to add</h2>
+						<p>The "login" workflow
+						<p>WebSocket support
+						<p>Handling of dripping responses
+						<p class=fragment>XML support?
+						<p class=fragment>Web hook/callback support?
+						<p class=fragment>You tell me!
 					</section>
 				</section>
 
 				<section>
 					<h1>napper</h1>
-					<p><code>python3.5 -m pip install --user napper</code></p>
-					<p><a href="https://github.com/epsy/napper">https://github.com/epsy/napper</a></p>
-					<p><a href="https://epsy.github.io/napper/">https://epsy.github.io/napper/</a></p>
+					<p><code>python3.5 -m pip install --user napper</code>
+					<p>Source: <a href="https://github.com/epsy/napper">https://github.com/epsy/napper</a>
+					<p>Slides: <a href="https://epsy.github.io/napper/">https://epsy.github.io/napper/</a>
+					<p>Chat: <a href="https://gitter.im/epsy/napper">https://gitter.im/epsy/napper</a>
 					<h2>Questions?</h2>
-
+				</section>
 			</div>
 
 		</div>
