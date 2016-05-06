@@ -1,10 +1,32 @@
 # napper -- A REST Client for Python
 # Copyright (C) 2016 by Yann Kaiser and contributors.
 # See AUTHORS and COPYING for details.
+import json
 import collections.abc
 
 from . import request, restspec
 from .util import requestmethods, rag, getattribute_dict, metafunc, METHODS
+
+
+class ResponseType:
+    async def parse_response(self, response):
+        return response
+
+    async def upgrade(self, data, request):
+        return data
+
+
+class TextResponse(ResponseType):
+    async def parse_response(self, response):
+        return await (await super().parse_response(response)).text()
+
+
+class JsonResponse(TextResponse):
+    async def parse_response(self, response):
+        return json.loads(await super().parse_response(response))
+
+    async def upgrade(self, data, request):
+        return upgrade_object(await super().upgrade(data, request), request)
 
 
 def upgrade_object(val, request, context=None):
@@ -74,7 +96,7 @@ class PaginatorObject(collections.abc.Sequence):
             return
         req = request.Request(self.request.site, 'get', url)
         await req
-        data = rag(req, '_raw_data')
+        data = await rag(req, 'parsed_response')()
         self.pages.append(data)
         self.cache.extend(self.spec.paginator_content(data))
 

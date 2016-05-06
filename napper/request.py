@@ -1,15 +1,12 @@
 # napper -- A REST Client for Python
 # Copyright (C) 2016 by Yann Kaiser and contributors.
 # See AUTHORS and COPYING for details.
-import json
-import asyncio
-
 import aiohttp
 
 from .restspec import RestSpec
-from .response import upgrade_object
+from .response import JsonResponse
 from .errors import CrossOriginRequestError, http
-from .util import m, rag, METHODS, metafunc, getattribute_common
+from .util import m, rag, METHODS, metafunc, getattribute_common, run_once_as_task
 
 
 class SessionFactory:
@@ -143,29 +140,35 @@ class Request(object):
     def __getitem__(self, key):
         return MultiRequestBuilder(self, (('item', key),))
 
+    response_type = JsonResponse()
+
+    @run_once_as_task
     @metafunc
-    @asyncio.coroutine
-    def _read_result(self):
-        self._response = r = yield from self.site._request(
+    async def response(self):
+        self._response = r = await self.site._request(
             self.method, self.url, **self.kwargs)
-        try:
-            self._raw_data = json.loads((yield from r.text()))
-        finally:
-            r.close()
+        return r
+
+    @run_once_as_task
+    @metafunc
+    async def parsed_response(self):
+        return await self.response_type.parse_response(await self.response())
+
+    @run_once_as_task
+    @metafunc
+    async def upgraded_response(self):
+        return await self.response_type.upgrade(await self.parsed_response(), self)
 
     expected = http.Success
 
     @metafunc
     def __await__(self):
-        try:
-            self._raw_data
-        except AttributeError:
-            yield from self._read_result()
+        data = yield from self.upgraded_response()
         cls = http.cls_for_code(self._response.status)
         if issubclass(cls, self.expected):
-            return upgrade_object(self._raw_data, self)
+            return data
         else:
-            raise cls(self, upgrade_object(self._raw_data, self))
+            raise cls(self, data)
 
     __iter__ = __await__ # compatibility with yield from (i.e. in __await__)
 

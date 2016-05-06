@@ -3,6 +3,7 @@
 # See AUTHORS and COPYING for details.
 import asyncio
 import functools
+import weakref
 
 
 def getattribute_common(func):
@@ -82,3 +83,13 @@ def requestmethods(cls):
 def run(coro):
     loop = asyncio.get_event_loop()
     return loop.run_until_complete(coro)
+
+
+def run_once_as_task(func):
+    tasks = weakref.WeakKeyDictionary()
+    @functools.wraps(func)
+    def _wrapper(self):
+        if self not in tasks:
+            tasks[self] = asyncio.ensure_future(func(self))
+        return tasks[self]
+    return _wrapper
