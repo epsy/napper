@@ -4,7 +4,7 @@
 from .util import Tests
 from .. import CrossOriginRequestError
 from ..request import Request, SessionFactory
-from ..response import PermalinkString
+from ..response import PermalinkString, ResponseType
 from .. import util, restspec, errors
 
 
@@ -291,3 +291,48 @@ class SiteTests(Tests):
         with session:
             self.assertFalse(ah_session.closed)
         self.assertTrue(ah_session.closed)
+
+
+class ResponseTypeTests(Tests):
+    def setUp(self):
+        super().setUp()
+
+        class CustomException(Exception):
+            pass
+
+        class ErrorOnParse(ResponseType):
+            async def parse_response(self, response):
+                raise CustomException
+
+        self.CustomException = CustomException
+        self.ErrorOnParse = ErrorOnParse
+
+    async def test_parse_exc(self):
+        req = self.site.path.get()
+        req.response_type = self.ErrorOnParse()
+        with self.text_response('{}'):
+            with self.assertRaises(self.CustomException):
+                await req
+
+    async def test_unexpected_status_and_parse_exc(self):
+        req = self.site.path.get()
+        req.response_type = self.ErrorOnParse()
+        with self.text_response('{}', status=400):
+            with self.assertRaises(errors.http.BadRequest) as r:
+                await req
+            with self.assertRaises(self.CustomException):
+                r.exception.response
+
+    async def test_unexpected_status_and_prepare_exc_await_twice(self):
+        req = self.site.path.get()
+        req.response_type = self.ErrorOnParse()
+        with self.text_response('{}', status=400):
+            with self.assertRaises(errors.http.BadRequest) as r:
+                await req
+            with self.assertRaises(self.CustomException):
+                r.exception.response
+
+            with self.assertRaises(errors.http.BadRequest) as r:
+                await req
+            with self.assertRaises(self.CustomException):
+                r.exception.response

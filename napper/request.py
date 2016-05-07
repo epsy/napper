@@ -163,12 +163,17 @@ class Request(object):
 
     @metafunc
     def __await__(self):
-        data = yield from self.upgraded_response()
+        yield from self.response()
         cls = http.cls_for_code(self._response.status)
         if issubclass(cls, self.expected):
-            return data
+            return (yield from self.upgraded_response())
         else:
-            raise cls(self, data)
+            try:
+                data = yield from self.upgraded_response()
+            except Exception as exc:
+                raise cls(self, None) from exc
+            else:
+                raise cls(self, data)
 
     __iter__ = __await__ # compatibility with yield from (i.e. in __await__)
 

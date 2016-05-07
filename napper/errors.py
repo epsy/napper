@@ -27,8 +27,18 @@ class http:
     class Any(Exception):
         def __init__(self, request, response):
             self.request = request
-            self.response = response
+            self._response = response
             self.status_code = request._response.status
+
+        @property
+        def response(self):
+            exc = getattr(self, '__cause__', None)
+            if exc is not None:
+                raise exc
+            return self._response
+
+        def __repr__(self):
+            return repr(self.response)
 
     code_classes = {
         1: "Informational",
