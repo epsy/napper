@@ -253,8 +253,8 @@ class StatusTests(RequestTests):
         with self.text_response('{"docs": "someplace"}', status=404):
             with self.assertRaises(errors.http.NotFound) as r:
                 await self.req
-            self.assertEqual(r.exception.docs, 'someplace')
-            self.assertEqual(r.exception['docs'], 'someplace')
+            self.assertEqual(r.exception.response.docs, 'someplace')
+            self.assertEqual(r.exception.response['docs'], 'someplace')
 
     async def test_404_expected(self):
         with self.text_response('{"docs": "someplace"}', status=404):
@@ -268,14 +268,14 @@ class StatusTests(RequestTests):
             with self.assertRaises(errors.http.ServerError) as r:
                 await self.req
             self.assertEqual(r.exception.status_code, 518)
-            self.assertEqual(r.exception.status, "all teapots unavailable")
+            self.assertEqual(r.exception.response.status, "all teapots unavailable")
 
     async def test_raise_unknown_status_class(self):
         with self.text_response('{"status": "your service will be assimilated"}', 600):
             with self.assertRaises(errors.http.Any) as r:
                 await self.req
             self.assertEqual(r.exception.status_code, 600)
-            self.assertEqual(r.exception.status, "your service will be assimilated")
+            self.assertEqual(r.exception.response.status, "your service will be assimilated")
 
     async def test_inst_http(self):
         with self.assertRaises(TypeError):

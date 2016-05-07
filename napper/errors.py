@@ -1,7 +1,6 @@
 # napper -- A REST Client for Python
 # Copyright (C) 2016 by Yann Kaiser and contributors.
 # See AUTHORS and COPYING for details.
-from . import util
 
 
 class CrossOriginRequestError(Exception):
@@ -30,14 +29,6 @@ class http:
             self.request = request
             self.response = response
             self.status_code = request._response.status
-
-        @util.getattribute_exc
-        def __getattribute__(self, key):
-            return getattr(util.rag(self, 'response'), key)
-
-        def __getitem__(self, key):
-            return util.rag(self, 'response')[key]
-
 
     code_classes = {
         1: "Informational",
