@@ -74,6 +74,7 @@ class Tests(unittest.TestCase, metaclass=TestsMeta):
         return SessionFactory.from_address(address)()
 
     def setUp(self):
+        asyncio.get_event_loop().run_until_complete(self.asyncSetUp())
         super().setUp()
         if not self.unclosed_ignored:
             Tests.unclosed_ignored = True
@@ -84,6 +85,15 @@ class Tests(unittest.TestCase, metaclass=TestsMeta):
         self.site = factory()
         self.addCleanup(rag(self.site, 'session').close)
         self.req = self.site.res.get()
+
+    async def asyncSetUp(self):
+        pass
+
+    def addAsyncCleanup(self, coroutine):
+        @self.addCleanup
+        def asyncCleanup():
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(coroutine)
 
     def read_restspec(self, **spec):
         spec.setdefault('base_address', 'http://www.example.org')
