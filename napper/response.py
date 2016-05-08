@@ -12,7 +12,7 @@ class ResponseType:
     async def parse_response(self, response):
         return response
 
-    async def upgrade(self, data, request):
+    def upgrade(self, data, request):
         return data
 
 
@@ -25,8 +25,8 @@ class JsonResponse(TextResponse):
     async def parse_response(self, response):
         return json.loads(await super().parse_response(response))
 
-    async def upgrade(self, data, request):
-        return upgrade_object(await super().upgrade(data, request), request)
+    def upgrade(self, data, request):
+        return upgrade_object(super().upgrade(data, request), request)
 
 
 def upgrade_object(val, request, context=None):

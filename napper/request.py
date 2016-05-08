@@ -161,7 +161,7 @@ class Request(object):
     @run_once_as_task
     @metafunc
     async def upgraded_response(self):
-        return await self.response_type.upgrade(await self.parsed_response(), self)
+        return self.response_type.upgrade(await self.parsed_response(), self)
 
     expected = http.Success
 
