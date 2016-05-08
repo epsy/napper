@@ -55,7 +55,7 @@ class ResponseList(collections.abc.Sequence):
         return repr(self.val)
 
     def __getitem__(self, i):
-        return self.val[i]
+        return self.request.response_type.upgrade(self.val[i], self.request)
 
     def __len__(self):
         return len(self.val)

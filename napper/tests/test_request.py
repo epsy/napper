@@ -221,24 +221,24 @@ class ValueTests(RequestTests):
 
 class IterTests(RequestTests):
     async def test_aiter(self):
-        resp = await self.request('{"ham": ["eggs", "spam"]}')
+        resp = await self.request('{"ham": [{"value": "eggs"}, {"value": "spam"}]}')
         items = []
         async for val in resp.ham:
-            items.append(val)
+            items.append(val.value)
         self.assertEqual(items, ['eggs', 'spam'])
 
     async def test_aiter_direct(self):
-        resp = await self.request('["eggs", "spam"]')
+        resp = await self.request('[{"value": "eggs"}, {"value": "spam"}]')
         items = []
         async for val in resp:
-            items.append(val)
+            items.append(val.value)
         self.assertEqual(items, ['eggs', 'spam'])
 
     async def test_aiter_direct_noawait(self):
-        with self.text_response('["eggs", "spam"]'):
+        with self.text_response('[{"value": "eggs"}, {"value": "spam"}]'):
             items = []
             async for val in self.req:
-                items.append(val)
+                items.append(val.value)
         self.assertEqual(items, ['eggs', 'spam'])
 
     async def test_paginated_list_after_link(self):
