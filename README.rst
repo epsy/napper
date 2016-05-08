@@ -23,7 +23,7 @@ Currently in experimental stage. Use at your own risk.
     async def getstargazers():
         """Print the most popular repository of the authors of
         the most recent gists from github."""
-        with github() as site:
+        async with github() as site:
             async for gist in site.gists.get():
                 try:
                     repo = await gist.owner.repos_url.get()[0]

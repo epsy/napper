@@ -1,6 +1,9 @@
 {
     "base_address": "https://api.github.com/",
 
-    "permalink_object": { "attribute": "permalink" },
-    "permalink_attribute": { "suffix": "_url" }
+    "permalink_object": { "attr": "permalink" },
+    "permalink_attribute": [
+        { "context": "attribute" },
+        { "matches": { "suffix": "_url" } }
+        ]
 }
