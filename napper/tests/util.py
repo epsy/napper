@@ -80,14 +80,16 @@ class Tests(unittest.TestCase, metaclass=TestsMeta):
             Tests.unclosed_ignored = True
             warnings.filterwarnings(
                 'ignore', 'unclosed event loop', ResourceWarning)
-        self.sfactory = factory = SessionFactory.from_address(
-                                                    'http://www.example.org')
-        self.site = factory()
-        self.addCleanup(rag(self.site, 'session').close)
         self.req = self.site.res.get()
 
     async def asyncSetUp(self):
-        pass
+        self.sfactory = factory = SessionFactory.from_address(
+                                                    'http://www.example.org')
+        sessionmanager = factory()
+        aexit = type(sessionmanager).__aexit__
+        aenter = type(sessionmanager).__aenter__(sessionmanager)
+        self.site = await aenter
+        self.addAsyncCleanup(aexit(sessionmanager, None, None, None))
 
     def addAsyncCleanup(self, coroutine):
         @self.addCleanup

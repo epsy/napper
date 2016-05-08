@@ -1,6 +1,8 @@
 # napper -- A REST Client for Python
 # Copyright (C) 2016 by Yann Kaiser and contributors.
 # See AUTHORS and COPYING for details.
+import aiohttp
+
 from .util import Tests
 from .. import CrossOriginRequestError
 from ..request import Request, SessionFactory
@@ -9,23 +11,30 @@ from .. import util, restspec, errors
 
 
 class RequestBuilderTests(Tests):
-    def test_site(self):
-        with self.make_site('http://www.example.org/') as site:
+    async def test_site(self):
+        async with self.make_site('http://www.example.org/') as site:
             self.assertIs(util.rag(site, 'site'), site)
             self.assertEqual(util.rag(site, 'spec').address,
                              'http://www.example.org')
 
-    def test_site_deep(self):
-        with self.make_site('http://www.example.org/apath') as site:
+    async def test_site_deep(self):
+        async with self.make_site('http://www.example.org/apath') as site:
             self.assertIs(util.rag(site, 'site'), site)
             self.assertEqual(util.rag(site, 'spec').address,
                              'http://www.example.org/apath')
 
-    def test_site_deep2(self):
-        with self.make_site('http://www.example.org/apath/subpath') as site:
+    async def test_site_deep2(self):
+        async with self.make_site('http://www.example.org/apath/subpath') as site:
             self.assertIs(util.rag(site, 'site'), site)
             self.assertEqual(util.rag(site, 'spec').address,
                              'http://www.example.org/apath/subpath')
+
+    def test_site_noasync_fails(self):
+        sessionmanager = self.make_site('http://www.example.org/')
+        with self.assertRaises((TypeError, AttributeError)):
+            with sessionmanager:
+                pass
+        sessionmanager.http_session.close()
 
     def test_get_root(self):
         self.assertRequestEqual(self.site.get(), 'get', 'http://www.example.org/')
@@ -51,18 +60,18 @@ class RequestBuilderTests(Tests):
         with self.assertRaises(TypeError):
             self.site.apath.subpath()
 
-    def test_trailing_slash(self):
-        with self.make_site('http://www.example.org/apath/') as site:
+    async def test_trailing_slash(self):
+        async with self.make_site('http://www.example.org/apath/') as site:
             self.assertRequestEqual(
                 site.subpath.get(),
                 'get', 'http://www.example.org/apath/subpath')
-        with self.make_site('http://www.example.org/apath') as site:
+        async with self.make_site('http://www.example.org/apath') as site:
             self.assertRequestEqual(
                 site.subpath.get(),
                 'get', 'http://www.example.org/apath/subpath')
 
-    def test_site_attrs(self):
-        with self.make_site('http://www.example.org/apath') as site:
+    async def test_site_attrs(self):
+        async with self.make_site('http://www.example.org/apath') as site:
             subp = site.subpath
             sreq = subp.get()
             ureq = subp.get()
@@ -283,12 +292,12 @@ class StatusTests(RequestTests):
 
 
 class SiteTests(Tests):
-    def test_close_session(self):
+    async def test_close_session(self):
         factory = SessionFactory.from_address('http://www.example.org/')
-        session = factory()
-        ah_session = util.rag(session, 'session')
+        ah_session = aiohttp.ClientSession()
+        sessionmanager = factory(session=ah_session)
         self.assertFalse(ah_session.closed)
-        with session:
+        async with sessionmanager:
             self.assertFalse(ah_session.closed)
         self.assertTrue(ah_session.closed)
 

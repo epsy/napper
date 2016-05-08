@@ -33,7 +33,19 @@ class SessionFactory:
             if proxy is not None:
                 conn = aiohttp.ProxyConnector(proxy=proxy)
             session = aiohttp.ClientSession(connector=conn)
-        return Session(self.spec, session)
+        return SessionManager(self.spec, session)
+
+
+class SessionManager:
+    def __init__(self, spec, http_session):
+        self.spec = spec
+        self.http_session = http_session
+
+    async def __aenter__(self):
+        return Session(self.spec, self.http_session)
+
+    async def __aexit__(self, typ, val, tb):
+        self.http_session.close()
 
 
 _unset = object()
@@ -52,14 +64,6 @@ class Session:
     @metafunc
     def __repr__(self):
         return "<Site [{0.spec.address}]>".format(self)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args, **kwargs):
-        rag(self, 'session').close()
-
-    close = __exit__
 
     @metafunc
     def __getitem__(self, name):
