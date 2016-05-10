@@ -4,10 +4,7 @@
 import aiohttp
 
 from .util import Tests
-from .. import CrossOriginRequestError
-from ..request import Request, SessionFactory
-from ..response import PermalinkString, ResponseType
-from .. import util, restspec, errors
+from .. import util, request, response, restspec, errors
 
 
 class RequestBuilderTests(Tests):
@@ -111,7 +108,7 @@ class FollowTests(RequestTests):
         util.rag(self.site, 'spec').is_permalink_attr = self.matcher
         with self.text_response('{"thing": "http://www.example.com/"}'):
             nextreq = await self.req.thing
-        with self.assertRaises(CrossOriginRequestError):
+        with self.assertRaises(errors.CrossOriginRequestError):
             with self.text_response('"I am the danger"'):
                 await nextreq.get()
 
@@ -122,11 +119,11 @@ class FollowTests(RequestTests):
         with self.text_response('{"eggs_url": "http://www.example.org/eggs"}'):
             resp = await req
         perma = resp.eggs
-        self.assertIsInstance(perma, PermalinkString)
+        self.assertIsInstance(perma, response.PermalinkString)
         self.assertIs(util.rag(perma, 'origin_request')._real_object, req)
         self.assertEqual(perma, "http://www.example.org/eggs")
         req2 = perma.get()
-        self.assertIsInstance(req2, Request)
+        self.assertIsInstance(req2, request.Request)
         self.assertAttrEqual(req2, 'url', "http://www.example.org/eggs")
         self.assertIs(util.rag(req2, 'site')._real_object, self.site)
 
@@ -136,7 +133,7 @@ class FollowTests(RequestTests):
         with self.text_response('{"permalink": "http://www.example.org/eggs"}'):
             resp = await req
         req2 = resp.get()
-        self.assertIsInstance(req2, Request)
+        self.assertIsInstance(req2, request.Request)
         self.assertAttrEqual(req2, 'url', "http://www.example.org/eggs")
         self.assertIs(util.rag(req2, 'site')._real_object, self.site)
 
@@ -293,7 +290,7 @@ class StatusTests(RequestTests):
 
 class SiteTests(Tests):
     async def test_close_session(self):
-        factory = SessionFactory.from_address('http://www.example.org/')
+        factory = request.SessionFactory.from_address('http://www.example.org/')
         ah_session = aiohttp.ClientSession()
         sessionmanager = factory(session=ah_session)
         self.assertFalse(ah_session.closed)
@@ -309,7 +306,7 @@ class ResponseTypeTests(Tests):
         class CustomException(Exception):
             pass
 
-        class ErrorOnParse(ResponseType):
+        class ErrorOnParse(response.ResponseType):
             async def parse_response(self, response):
                 raise CustomException
 
