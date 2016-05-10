@@ -21,6 +21,11 @@ class TextResponse(ResponseType):
         return await (await super().parse_response(response)).text()
 
 
+class BytesResponse(ResponseType):
+    async def parse_response(self, response):
+        return await (await super().parse_response(response)).read()
+
+
 class JsonResponse(TextResponse):
     async def parse_response(self, response):
         return json.loads(await super().parse_response(response))

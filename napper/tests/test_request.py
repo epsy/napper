@@ -342,3 +342,11 @@ class ResponseTypeTests(Tests):
                 await req
             with self.assertRaises(self.CustomException):
                 r.exception.response
+
+    async def test_binary_response(self):
+        content = b'\x00\x01\x02\x03'
+        req = self.site.path.get()
+        req.response_type = response.BytesResponse()
+        with self.text_response(content):
+            result = await req
+            self.assertEqual(result, content)

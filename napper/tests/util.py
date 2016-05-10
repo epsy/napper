@@ -17,7 +17,10 @@ from .. import restspec
 
 class FakeTextResponse(object):
     def __init__(self, response, status=200):
-        self._response = response
+        if isinstance(response, bytes):
+            self._bytes_response = response
+        else:
+            self._response = response
         self.status = status
 
     async def text(self, encoding=None):
@@ -25,6 +28,9 @@ class FakeTextResponse(object):
 
     async def json(self, encoding=None, loads=json.loads):
         return loads(self._response)
+
+    async def read(self):
+        return self._bytes_response
 
     def close(self):
         pass
