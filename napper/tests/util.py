@@ -36,7 +36,7 @@ class FakeTextResponse(object):
         pass
 
 
-def _fut_result(result):
+def fut_result(result):
     ret = asyncio.Future()
     ret.set_result(result)
     return ret
@@ -116,7 +116,7 @@ class Tests(unittest.TestCase, metaclass=TestsMeta):
             req = self.req
         site = rag(req, 'site')
         return patch.object(site.session, 'request', side_effect=(
-            _fut_result(response) for response in responses))
+            fut_result(response) for response in responses))
 
     def text_response(self, text, status=200, *, req=None):
         return self.text_responses(text, final_status=status, req=req)
