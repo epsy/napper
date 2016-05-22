@@ -42,11 +42,15 @@ def fut_result(result):
     return ret
 
 
+TIMEOUT = 10
+
+
 def _make_asyncwrapper(func):
     @wraps(func)
     def asyncwrapper(self):
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(func(self))
+        loop.set_debug(True)
+        loop.run_until_complete(asyncio.wait_for(func(self), TIMEOUT))
     return asyncwrapper
 
 
