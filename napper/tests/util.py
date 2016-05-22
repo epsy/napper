@@ -111,17 +111,20 @@ class Tests(unittest.TestCase, metaclass=TestsMeta):
         return json.loads(json.dumps(obj),
                           object_hook=restspec.WarnOnUnusedKeys)
 
-    def text_response(self, text, status=200, *, req=None):
-        return self.text_responses(text, final_status=status, req=req)
-
-    def text_responses(self, *responses, final_status=200, req=None):
+    def mock_responses(self, *responses, req=None):
         if req is None:
             req = self.req
         site = rag(req, 'site')
         return patch.object(site.session, 'request', side_effect=(
-            _fut_result(FakeTextResponse(text, final_status if not i else 200))
-            for i, text in enumerate(responses, 1 - len(responses))
-        ))
+            _fut_result(response) for response in responses))
+
+    def text_response(self, text, status=200, *, req=None):
+        return self.text_responses(text, final_status=status, req=req)
+
+    def text_responses(self, *responses, final_status=200, req=None):
+        return self.mock_responses(*(
+            FakeTextResponse(text, final_status if not i else 200)
+            for i, text in enumerate(responses, 1 - len(responses))))
 
     def assertRequestMade(self, mock, method, url, params={}, **kwargs):
         return mock.assert_called_once_with(
