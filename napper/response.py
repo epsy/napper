@@ -17,8 +17,13 @@ class ResponseType:
 
 
 class TextResponse(ResponseType):
+    def __init__(self, *, encoding=None, **kwargs):
+        super().__init__(**kwargs)
+        self.encoding = encoding
+
     async def parse_response(self, response):
-        return await (await super().parse_response(response)).text()
+        response = await super().parse_response(response)
+        return await response.text(encoding=self.encoding)
 
 
 class BytesResponse(ResponseType):

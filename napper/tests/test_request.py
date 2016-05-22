@@ -1,9 +1,10 @@
 # napper -- A REST Client for Python
 # Copyright (C) 2016 by Yann Kaiser and contributors.
 # See AUTHORS and COPYING for details.
+import unittest.mock
 import aiohttp
 
-from .util import Tests
+from .util import Tests, FakeTextResponse, fut_result
 from .. import util, request, response, restspec, errors
 
 
@@ -350,3 +351,19 @@ class ResponseTypeTests(Tests):
         with self.text_response(content):
             result = await req
             self.assertEqual(result, content)
+
+    async def test_text_response_encoding(self):
+        respobj = FakeTextResponse("{}")
+        respobj.text = unittest.mock.Mock(return_value=fut_result("{}"))
+        self.req.response_type = response.TextResponse(encoding='utf-8')
+        with self.mock_responses(respobj):
+            await self.req
+        respobj.text.assert_called_once_with(encoding='utf-8')
+
+    async def test_json_response_encoding(self):
+        respobj = FakeTextResponse("{}")
+        respobj.text = unittest.mock.Mock(return_value=fut_result("{}"))
+        self.req.response_type = response.JsonResponse(encoding='utf-8')
+        with self.mock_responses(respobj):
+            await self.req
+        respobj.text.assert_called_once_with(encoding='utf-8')
