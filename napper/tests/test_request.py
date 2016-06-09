@@ -2,6 +2,7 @@
 # Copyright (C) 2016 by Yann Kaiser and contributors.
 # See AUTHORS and COPYING for details.
 import unittest.mock
+
 import aiohttp
 
 from .util import Tests, FakeTextResponse, fut_result

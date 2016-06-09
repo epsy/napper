@@ -4,8 +4,10 @@
 import json
 import collections.abc
 
+import aiohttp
+
 from . import request, restspec
-from .util import requestmethods, rag, getattribute_dict, metafunc, METHODS
+from .util import requestmethods, rag, getattribute_dict, metafunc, METHODS, UniversalDetector
 
 
 class ResponseType:
@@ -37,6 +39,134 @@ class JsonResponse(TextResponse):
 
     def upgrade(self, data, request):
         return upgrade_object(super().upgrade(data, request), request)
+
+
+class DrippingResponse(ResponseType):
+    def __init__(self, item_type, *, separator=b'\n', include_separator=True,
+                                     remainder='return'):
+        self.item_type = item_type
+        self.separator = separator
+        self.include_separator = include_separator
+        self.remainder = remainder
+
+    async def parse_response(self, response):
+        return response
+
+    def upgrade(self, data, request):
+        return ResponseReleaser(Dripper(self, data, request), data)
+
+
+class DrippedBytesResponse(BytesResponse):
+    async def parse_response(self, dripper_value):
+        dripper, value = dripper_value
+        return value
+
+
+class DrippedTextResponse(TextResponse):
+    async def _get_encoding(self, dripper, value):
+        if self.encoding is not None:
+            return self.encoding
+
+        response = dripper.response
+
+        content_type = response.headers.get(aiohttp.hdrs.CONTENT_TYPE, '').lower()
+        _, _, _, params = aiohttp.helpers.parse_mimetype(content_type)
+        self.encoding = params.get('charset')
+
+        if self.encoding is not None:
+            return self.encoding
+
+        reader = dripper.response.content
+
+        detector = UniversalDetector()
+        detector.feed(value)
+        detector.feed(reader._buffer)
+
+        pos = len(reader._buffer)
+
+        while not detector.done and not reader._eof:
+            await reader._wait_for_data('DrippedTextResponse._get_encoding')
+            detector.feed(reader._buffer[pos:])
+            pos = len(reader._buffer)
+
+        if not detector.done:
+            detector.close()
+
+        self.encoding = detector.result['encoding']
+        return self.encoding
+
+    async def parse_response(self, dripper_value):
+        dripper, value = dripper_value
+        enc = await self._get_encoding(dripper, value)
+        return value.decode(enc)
+
+
+class ResponseReleaser:
+    def __init__(self, obj, response):
+        self.obj = obj
+        self.response = response
+
+    async def __aenter__(self):
+        return self.obj
+
+    async def __aexit__(self, typ, val, tb):
+        await self.response.release()
+
+
+class Dripper:
+    def __init__(self, response_type, response, request):
+        self.response_type = response_type
+        self.response = response
+        self.request = request
+        self._buffer = b''
+        self._finished = False
+
+        self.item_type = self.response_type.item_type
+        self.item_type.__class__ = self._upgrade_item_type(type(self.item_type))
+
+    def _upgrade_item_type(self, typ):
+        if issubclass(typ, BytesResponse):
+            mixin = DrippedBytesResponse
+        elif issubclass(typ, TextResponse):
+            mixin = DrippedTextResponse
+        else:
+            raise TypeError("Unsupported type for dripping: {}".format(typ))
+
+        if typ in [BytesResponse, TextResponse]:
+            return mixin
+        else:
+            return type('Dripped' + typ.__name__, (typ, mixin), {})
+
+    async def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self._finished:
+            raise StopAsyncIteration
+        reader = self.response.content
+        rt = self.response_type
+        sep = rt.separator
+        while sep not in reader._buffer:
+            if reader._eof:
+                self._finished = True
+                if rt.remainder == 'return':
+                    remainder = await reader.read()
+                    if remainder:
+                        return await self.return_value(remainder)
+                elif rt.remainder == 'ignore':
+                    pass
+                elif rt.remainder == 'error':
+                    raise ValueError("Data remains after last separator")
+                else:
+                    raise ValueError("Bad value for remainder handling")
+                raise StopAsyncIteration
+            await reader._wait_for_data('dripper.__anext__')
+        return await self.return_value(
+            await reader.read(len(sep) + reader._buffer.index(sep)))
+
+    async def return_value(self, value):
+        parsed = await self.item_type.parse_response((self, value))
+        return self.item_type.upgrade(parsed, self.request)
 
 
 def upgrade_object(val, request, context=None):

@@ -10,30 +10,44 @@ import json
 import warnings
 import io
 
+import aiohttp
+
 from ..util import rag
 from ..request import Request, SessionFactory
 from .. import restspec
 
 
 class FakeTextResponse(object):
-    def __init__(self, response, status=200):
+    def __init__(self, response, status=200,
+                 ctype="application/json", charset="utf-8"):
         if isinstance(response, bytes):
             self._bytes_response = response
         else:
             self._response = response
         self.status = status
+        if ctype is not None:
+            hdr = ctype
+            if charset is not None:
+                hdr += "; charset=" + charset
+            self.headers = aiohttp.CIMultiDict([
+                ("Content-Type", hdr)
+            ])
+        self.closed = False
 
     async def text(self, encoding=None):
+        await self.release()
         return self._response
 
     async def json(self, encoding=None, loads=json.loads):
+        await self.release()
         return loads(self._response)
 
     async def read(self):
+        await self.release()
         return self._bytes_response
 
-    def close(self):
-        pass
+    async def release(self):
+        self.closed = True
 
 
 def fut_result(result):

@@ -10,7 +10,7 @@ setup(
     url='https://github.com/epsy/napper',
     author='Yann Kaiser',
     author_email='kaiser.yann@gmail.com',
-    install_requires=['aiohttp'],
+    install_requires=['aiohttp', 'chardet'],
     packages=('napper', 'napper.tests'),
     keywords=[
         'http', 'requests', 'api', 'asyncio', 'asynchronous'

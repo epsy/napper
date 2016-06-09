@@ -6,6 +6,15 @@ import functools
 import weakref
 
 
+try:
+    import cchardet.universaldetector as chardet
+except ImportError:
+    import chardet.universaldetector
+
+
+UniversalDetector = chardet.universaldetector.UniversalDetector
+
+
 def getattribute_common(func):
     @functools.wraps(func)
     def _wrapper(self, attr):
