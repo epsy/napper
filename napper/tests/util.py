@@ -9,12 +9,22 @@ import asyncio
 import json
 import warnings
 import io
+import sys
 
 import aiohttp
 
 from ..util import rag
 from ..request import Request, SessionFactory
 from .. import restspec
+
+
+try:
+    trace_func = sys.gettrace()
+except:
+    pass
+else:
+    if trace_func:
+        asyncio.get_event_loop().slow_callback_duration = 1000
 
 
 class FakeTextResponse(object):
