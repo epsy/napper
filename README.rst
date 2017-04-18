@@ -39,3 +39,8 @@ Currently in experimental stage. Use at your own risk.
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(getstargazers())
+
+
+.. image:: https://badges.gitter.im/epsy/napper.svg
+   :alt: Join the chat at https://gitter.im/epsy/napper
+   :target: https://gitter.im/epsy/napper?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
